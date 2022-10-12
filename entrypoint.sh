@@ -29,6 +29,17 @@ echo "   UPSTREAM_BRANCH:  $UPSTREAM_BRANCH"
 echo "   ORIGIN_BRANCH:    $ORIGIN_BRANCH"
 echo "   WORKFLOW:         $WORKFLOW"
 
+# Setup GIT config
+function set_git_safe_dir {
+    if [ -z "$1" ]; then
+        echo "set_git_safe_dir: Invalid parameter"
+        exit 1
+    fi
+
+    echo "git config --global --add safe.directory $1"
+    git config --global --add safe.directory $1
+}
+
 # Check Github Token
 function check_github_token {
     if [ -z "$GITHUB_TOKEN" ]; then
@@ -37,12 +48,16 @@ function check_github_token {
     fi
 }
 
+git config --global user.name "$GITHUB_ACTOR"
+git config --global user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
 # Dispatch the task
 case $TASK in
     sync|Sync|SYNC)
         echo "Task: Sync Repo"
             # requires GITHUB_TOKEN
             check_github_token
+            set_git_safe_dir $GITHUB_WORKSPACE
             # calling sync_repo
             # param: upstream_repo
             # param: upstream_branch
