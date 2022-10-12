@@ -48,7 +48,7 @@ case $TASK in
             # param: upstream_branch
             # param: origin_branch
             # param: workflow
-            ./sync_repo.sh $UPSTREAM_REPO $UPSTREAM_BRANCH $ORIGIN_BRANCH $WORKFLOW
+            /sync_repo.sh $UPSTREAM_REPO $UPSTREAM_BRANCH $ORIGIN_BRANCH $WORKFLOW
         ;;
     *)
         echo "Unknown TASK: $TASK"
