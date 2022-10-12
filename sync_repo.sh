@@ -28,8 +28,6 @@ WORKFLOW_BRANCH=$4
 
 # Git Config
 echo ">>> Setup git config <<<"
-echo "    Add $GITHUB_WORKSPACE to git safe.directory"
-git config --global --add safe.directory $GITHUB_WORKSPACE
 git config --global user.name "$GITHUB_ACTOR"
 git config --global user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
