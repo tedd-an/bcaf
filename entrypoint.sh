@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -echo
+set -e
 
 echo "Environment Variables:"
 echo "   Workflow:   $GITHUB_WORKFLOW"
