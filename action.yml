@@ -1,0 +1,32 @@
+# Action.yml
+name: 'bzcafe'
+description: 'BlueZ CI Automation Framework'
+inputs:
+  task:
+    description: Name of task to perform. [sync, ]
+    required: true
+  upstream_repo:
+    description: Upstream repo to be sync'ed
+    default: ''
+  upstream_branch:
+    description: The name of branch to be sync'ed
+    default: 'master'
+  origin_branch:
+    description: The name of branch to sync
+    default: 'master'
+  workflow:
+    description: The name of branch where workflow items are checked in
+    default: 'workflow'
+  github_token:
+    description: Github token
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  evn:
+    GITHUB_TOKEN: ${{ inputs.github_token }}
+  args:
+    - ${{ inputs.task }}
+    - ${{ inputs.upstream_repo }}
+    - ${{ inputs.upstream_branch }}
+    - ${{ inputs.origin_branch }}
+    - ${{ inputs.workflow }}
