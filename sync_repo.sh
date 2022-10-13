@@ -23,9 +23,9 @@ echo "    git fetch upstream $UPSTREAM_BRANCH"
 git fetch upstream $UPSTREAM_BRANCH
 
 echo ">>> Check Origin and Upstream"
-ORIGIN_HEAD=$(git log -1 --format=%H origin/master)
+ORIGIN_HEAD=$(git log -1 --format=%H origin/$ORIGIN_BRANCH)
 echo "    ORIGIN_HEAD: $ORIGIN_HEAD"
-UPSTREAM_HEAD=$(git log -1 --format=%H upstream/master)
+UPSTREAM_HEAD=$(git log -1 --format=%H upstream/$UPSTREAM_BRANCH)
 echo "    UPSTREAM_HEAD: $UPSTREAM_HEAD"
 
 if [ "$ORIGIN_HEAD" = "$UPSTREAM_HEAD" ]; then
@@ -39,16 +39,17 @@ echo "    git remote set-branches origin *"
 git remote set-branches origin '*'
 echo "    git fetch origin --unshallow"
 git fetch origin --unshallow
-echo "    git pull --tags --rebase upstream master"
-git pull --tags --rebase upstream master
-echo "    git push --force origin master"
-git push --force origin master
+echo "    git push -f origin refs/remotes/upstream/$UPSTREAM_BRANCH:refs/heads/$ORIGIN_BRANCH"
+git push -f origin "refs/remotes/upstream/$UPSTREAM_BRANCH:refs/heads/$ORIGIN_BRANCH"
+echo "    git push -f origin refs/tags/*"
+git push -f origin "refs/tags/*"
+
 
 echo ">>> Cherry-pick workflow commit"
 WORKFLOW_SHA=$(git log -1 --format=%H origin/$WORKFLOW_BRANCH)
 echo "    workflow commit: $WORKFLOW_SHA"
-echo "    git checkout -b $WORKFLOW_BRANCH origin/master"
-git checkout -b $WORKFLOW_BRANCH origin/master
+echo "    git checkout -b $WORKFLOW_BRANCH origin/$ORIGIN_BRANCH"
+git checkout -b $WORKFLOW_BRANCH origin/$ORIGIN_BRANCH
 echo "    git branch"
 git branch
 echo "    git cherry-pick $WORKFLOW_SHA"
