@@ -7,7 +7,8 @@ import libs
 
 class EmailTool:
 
-    def __init__(self, server, port, sender, receivers=[], startls=True, token=None):
+    def __init__(self, server=None, port=None, sender=None, receivers=[],
+                 startls=True, token=None, config=None):
         self._server = server
         self._port = port
         self._sender = sender
@@ -15,6 +16,16 @@ class EmailTool:
         self._starttls = startls
         self._token = token
         self._message = MIMEMultipart()
+
+        if config:
+            if 'server' in config:
+                server = config['server']
+            if 'port' in config:
+                port = config['port']
+            if 'user' in config:
+                sender = config['user']
+            if 'startls' in config:
+                startls = config['startls']
 
     def send(self):
         try:
@@ -33,11 +44,15 @@ class EmailTool:
 
         libs.log_info("Email sent successfully")
 
+    def set_receivers(self, receivers):
+        self._receivers = receivers
+        libs.log_info("Receivers are updated")
+
     def set_token(self, token):
         self._token = token
         libs.log_info("Email Token is updated")
 
-    def update_header(self, headers):
+    def _update_header(self, headers):
         for key, value in headers.items():
             self._message.add_header(key, value)
 
@@ -45,6 +60,6 @@ class EmailTool:
         self._message['From'] = self._sender
         self._message['Subject'] = title
         self._message.attach(MIMEText(body, 'plain'))
-        self.update_header(headers)
+        self._update_header(headers)
 
         libs.log_debug(f"EMAIL Message: \n{self._message}")

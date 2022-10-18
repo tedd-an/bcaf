@@ -21,6 +21,7 @@ UPSTREAM_REPO=$2
 UPSTREAM_BRANCH=$3
 ORIGIN_BRANCH=$4
 WORKFLOW=$5
+SPACE=$6
 
 echo "Input Parameters:"
 echo "   TASK:             $TASK"
@@ -28,6 +29,7 @@ echo "   UPSTREAM_REPO:    $UPSTREAM_REPO"
 echo "   UPSTREAM_BRANCH:  $UPSTREAM_BRANCH"
 echo "   ORIGIN_BRANCH:    $ORIGIN_BRANCH"
 echo "   WORKFLOW:         $WORKFLOW"
+echo "   SPACE:            $SPACE"
 
 # Setup GIT config
 function set_git_safe_dir {
@@ -36,14 +38,40 @@ function set_git_safe_dir {
         exit 1
     fi
 
-    echo "git config --global --add safe.directory $1"
+    echo "Add repo to safe.directory: $1"
+    echo "$ git config --global --add safe.directory $1"
     git config --global --add safe.directory $1
+}
+
+# Setup GIT Remote URL with github token
+function update_github_token {
+    if [ -z "$1" ]; then
+        echo "update_github_token: Invalid parameter"
+        exit 1
+    fi
+    echo "Update repo origin with github token"
+    echo "$ git remote set-url origin https://x-access-token:$GITHUB_TOKEN@github.com/$1"
+    git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$1"
 }
 
 # Check Github Token
 function check_github_token {
     if [ -z "$GITHUB_TOKEN" ]; then
         echo "Set GITHUB_TOKEN environment variable"
+        exit 1
+    fi
+}
+
+function check_patchwork_token {
+    if [ -z "$PATCHWORK_TOKEN" ]; then
+        echo "Set PATCHWORK_TOKEN environment variable"
+        exit 1
+    fi
+}
+
+function check_email_token {
+    if [ -z "$EMAIL_TOKEN" ]; then
+        echo "Set EMAIL_TOKEN environment variable"
         exit 1
     fi
 }
@@ -64,6 +92,17 @@ case $TASK in
             # param: origin_branch
             # param: workflow
             /sync_repo.sh $UPSTREAM_REPO $UPSTREAM_BRANCH $ORIGIN_BRANCH $WORKFLOW
+        ;;
+    patchwork|Patchwork|PATCHWORK)
+        echo "Task: Sync Patchwork"
+            # required tokens
+            check_github_token
+            check_email_token
+            check_patchwork_token
+            set_git_safe_dir $GITHUB_WORKSPACE
+            update_github_token $GITHUB_REPOSITORY
+            # calling sync_patchwork.py
+            /sync_patchwork -c /config.json -b $WORKFLOW -r $UPSTREAM_REPO -t $SPACE -s $GITHUB_WORKSPACE
         ;;
     *)
         echo "Unknown TASK: $TASK"

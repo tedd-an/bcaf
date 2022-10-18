@@ -3,3 +3,4 @@ from .cibase import CiBase, EndTest, Verdict
 from .patchwork import Patchwork, PostException
 from .email import EmailTool
 from .repotool import RepoTool
+from .githubtool import GithubTool

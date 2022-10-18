@@ -36,16 +36,6 @@ def log_debug(msg):
     if logger is not None:
         logger.debug(msg)
 
-
-class CmdError(Exception):
-    def __init__(self, cmd, retcode, stdout, stderr):
-        super().__init__(cmd, retcode, stdout, stderr)
-
-        self.cmd = cmd
-        self.retcode = retcode
-        self.stdout = stdout
-        self.stderr = stderr
-
 def cmd_run(cmd: List[str], shell=False, add_env=None, cwd=None, pass_fds=()):
     env = os.environ.copy()
     if add_env:
@@ -79,6 +69,5 @@ def cmd_run(cmd: List[str], shell=False, add_env=None, cwd=None, pass_fds=()):
     if proc.returncode != 0:
         if stderr and stderr[:-1] == "\n":
             stderr = stderr[:-1]
-        raise CmdError("Command Failed: %s" % (str(proc.args), ), proc.returncode, stdout, stderr)
 
-    return stdout, stderr
+    return proc.returncode, stdout, stderr

@@ -3,11 +3,11 @@ name: 'bzcafe'
 description: 'BlueZ CI Automation Framework'
 inputs:
   task:
-    description: Name of task to perform. [sync, ]
+    description: Name of task to perform. [sync, patchwork]
     required: true
   upstream_repo:
     description: Upstream repo to be sync'ed
-    default: ''
+    default: 'na'
   upstream_branch:
     description: The name of branch to be sync'ed
     default: 'master'
@@ -17,16 +17,29 @@ inputs:
   workflow:
     description: The name of branch where workflow items are checked in
     default: 'workflow'
+  space:
+    description: Target space of the repo [user, kernel]
+    default: 'kernel'
   github_token:
     description: Github token
+    default: ''
+  email_token:
+    description: Email token
+    default: ''
+  patchwork_token:
+    description: Patchwork token
+    default: ''
 runs:
   using: 'docker'
   image: 'Dockerfile'
   env:
     GITHUB_TOKEN: ${{ inputs.github_token }}
+    EMAIL_TOKEN: ${{ inputs.email_token }}
+    PATCHWORK_TOKEN: ${{ inputs.patchwork_token }}
   args:
     - ${{ inputs.task }}
     - ${{ inputs.upstream_repo }}
     - ${{ inputs.upstream_branch }}
     - ${{ inputs.origin_branch }}
     - ${{ inputs.workflow }}
+    - ${{ inputs.space }}
