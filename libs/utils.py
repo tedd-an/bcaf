@@ -2,7 +2,8 @@ import logging
 import os
 import subprocess
 import time
-from typing import List
+import re
+from typing import List, Dict, Tuple
 
 # Global logging object
 logger = None
@@ -36,7 +37,28 @@ def log_debug(msg):
     if logger is not None:
         logger.debug(msg)
 
-def cmd_run(cmd: List[str], shell=False, add_env=None, cwd=None, pass_fds=()):
+def pr_get_sid(pr_title):
+    """
+    Parse PR title prefix and get PatchWork Series ID
+    PR Title Prefix = "[PW_S_ID:<series_id>] XXXXX"
+    """
+
+    try:
+        sid = re.search(r'^\[PW_SID:([0-9]+)\]', pr_title).group(1)
+    except AttributeError:
+        log_error(f"Unable to find the series_id from title {pr_title}")
+        sid = None
+
+    return sid
+
+def cmd_run(cmd: List[str], shell: bool = False, add_env: Dict[str, str] = None,
+            cwd: str = None, pass_fds=()) -> Tuple[str, str, str]:
+    log_info(f"------------- CMD_RUN -------------")
+    log_info(f"CMD: {cmd}")
+
+    stdout = ""
+
+    # Update ENV
     env = os.environ.copy()
     if add_env:
         env.update(add_env)
@@ -45,13 +67,17 @@ def cmd_run(cmd: List[str], shell=False, add_env=None, cwd=None, pass_fds=()):
 
     proc = subprocess.Popen(cmd, shell=shell, env=env, cwd=cwd,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            bufsize=1, universal_newlines=True,
                             pass_fds=pass_fds)
 
-    log_info(f'CMD: {proc.args}')
+    # Print the stdout in realtime
+    for line in proc.stdout:
+        log_debug("> " + line.rstrip('\n'))
+        stdout += line
 
-    stdout, stderr = proc.communicate()
-    stdout = stdout.decode("utf-8", "ignore")
-    stderr = stderr.decode("utf-8", "ignore")
+    # STDOUT returned by proc.communicate() is empty because it was all consumed
+    # by the above read.
+    _stdout, stderr = proc.communicate()
     proc.stdout.close()
     proc.stderr.close()
 
@@ -60,14 +86,17 @@ def cmd_run(cmd: List[str], shell=False, add_env=None, cwd=None, pass_fds=()):
         stderr = stderr[:-1]
 
     log_info(f'RET: {proc.returncode}')
-    log_debug(f'STDOUT: {stdout}')
-    log_debug(f'STDERR: {stderr}')
-
-    elapsed_time = time.time() - start_time
-    log_debug(f'Elapsed Execution Time: {elapsed_time:.2f}')
+    # No need to print STDOUT here again. It is already printed above
+    # log_debug(f'STDOUT:{stdout}')
+    log_debug(f'STDERR:{stderr}')
 
     if proc.returncode != 0:
         if stderr and stderr[:-1] == "\n":
             stderr = stderr[:-1]
 
+    elapsed = time.time() - start_time
+
+    log_info(f"------------- CMD_RUN END ({elapsed:.2f} s) -------------")
     return proc.returncode, stdout, stderr
+
+

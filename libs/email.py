@@ -19,13 +19,13 @@ class EmailTool:
 
         if config:
             if 'server' in config:
-                server = config['server']
+                self._server = config['server']
             if 'port' in config:
-                port = config['port']
+                self._port = config['port']
             if 'user' in config:
-                sender = config['user']
+                self._sender = config['user']
             if 'startls' in config:
-                startls = config['startls']
+                self._startls = config['startls']
 
     def send(self):
         try:
@@ -58,6 +58,7 @@ class EmailTool:
 
     def compose(self, title, body, headers):
         self._message['From'] = self._sender
+        self._message['To'] = ", ".join(self._receivers)
         self._message['Subject'] = title
         self._message.attach(MIMEText(body, 'plain'))
         self._update_header(headers)

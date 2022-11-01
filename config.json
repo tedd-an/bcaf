@@ -1,6 +1,5 @@
 {
     "email": {
-      "enable": true,
       "server": "smtp.gmail.com",
       "port": 587,
       "user": "bluez.test.bot@gmail.com",

@@ -19,22 +19,28 @@ class RepoTool:
         if remote:
             self._remote = remote
 
+        # Last executed stdout and stderr
+        self.stdout = None
+        self.stderr = None
+
         self._verify_repo()
         libs.log_info(f'Git Repo({self._name}) verified: {self._path}')
 
-    def get_path(self):
+    def path(self):
         return self._path
 
     def git(self, args: List[str]):
-        return libs.cmd_run(["git"] + args, cwd=self._path)
+        (ret, self.stdout, self.stderr) = libs.cmd_run(["git"] + args,
+                                                       cwd=self._path)
+        return ret
 
     def _verify_repo(self):
         cmd = ["branch", "--show-current"]
-        try:
-            ret = self.git(cmd)
-        except:
-            libs.log_error("Failed to verify repo")
-            raise RepoToolNotRepo
+
+        ret = self.git(cmd)
+        # except:
+        #     libs.log_error("Failed to verify repo")
+        #     raise RepoToolNotRepo
         return ret
 
     def git_checkout(self, branch, create_branch=False):

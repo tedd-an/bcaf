@@ -23,7 +23,7 @@ class Patchwork():
         self._api = "/api" if api == None else f"/api/{api}"
         self._project_id= self._get_project_id(project_name)
 
-        libs.log_info(f"Connected to Patchwork Server: {self._server}")
+        libs.log_info(f"Connected to Patchwork Server: {self._server}: {self._project_id}")
 
     def set_token(self, token):
         self._token = token
@@ -105,7 +105,7 @@ class Patchwork():
             'description': desc
         }
 
-        resp = self._post(f'patches/{patch}/checks/', headers=headers, data=data)
+        resp = self._post(f"patches/{patch['id']}/checks/", headers=headers, data=data)
         if resp.status_code != 201:
             raise PostException(f"POST {resp.status_code}")
 
@@ -152,3 +152,21 @@ class Patchwork():
                     series_list.append(self.get_series(series['id']))
 
         return series_list
+
+    def save_patch_mbox(self, patch_id, filename):
+        patch_mbox = self.get_patch_mbox(patch_id)
+
+        with open(filename, 'w+') as f:
+            f.write(patch_mbox)
+
+        return filename
+
+    def save_patch_msg(self, patch_id, filename):
+        patch = self.get_patch(patch_id)
+
+        with open(filename, 'w+') as f:
+            f.write(patch['name'])
+            f.write('\n\n')
+            f.write(patch['content'])
+
+        return filename

@@ -1,8 +1,6 @@
 from github import Github
 import re
 
-import libs
-
 class GithubTool:
 
     def __init__(self, repo, token=None):
@@ -47,3 +45,12 @@ class GithubTool:
                 return True
 
         return False
+
+    def pr_post_comment(self, pr, comment):
+
+        try:
+            pr.create_issue_comment(comment)
+        except:
+            return False
+
+        return True

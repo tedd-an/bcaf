@@ -3,11 +3,14 @@ name: 'bzcafe'
 description: 'BlueZ CI Automation Framework'
 inputs:
   task:
-    description: Name of task to perform. [sync, patchwork]
+    description: Name of task to perform. [sync, patchwork, ci]
     required: true
+  base_folder:
+    description: Base folder for work
+    default: 'base'
   upstream_repo:
     description: Upstream repo to be sync'ed
-    default: 'na'
+    default: 'default'
   upstream_branch:
     description: The name of branch to be sync'ed
     default: 'master'
@@ -38,6 +41,7 @@ runs:
     PATCHWORK_TOKEN: ${{ inputs.patchwork_token }}
   args:
     - ${{ inputs.task }}
+    - ${{ inputs.base_folder }}
     - ${{ inputs.upstream_repo }}
     - ${{ inputs.upstream_branch }}
     - ${{ inputs.origin_branch }}

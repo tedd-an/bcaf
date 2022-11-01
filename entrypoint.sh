@@ -104,6 +104,13 @@ case $TASK in
             # calling sync_patchwork.py
             /sync_patchwork -c /config.json -b $WORKFLOW -r $UPSTREAM_REPO -t $SPACE -s $GITHUB_WORKSPACE
         ;;
+    ci|CI|Ci)
+        echo "Task: CI"
+            check_github_token
+            check_email_token
+            check_patchwork_token
+            set_git_safe_dir $GITHUB_WORKSPACE
+        ;;
     *)
         echo "Unknown TASK: $TASK"
         ;;

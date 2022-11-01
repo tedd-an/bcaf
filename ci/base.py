@@ -1,6 +1,12 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 import time
+import sys
+
+from libs import utils
+
+sys.path.insert(0, '../libs')
+from libs import log_debug
 
 class Verdict(Enum):
     PENDING = 0
@@ -16,23 +22,12 @@ class EndTest(Exception):
     End of Test
     """
 
-
-class CiBase(ABC):
+class Base(ABC):
     """
     Base class for CI Tests.
     """
-    name = None
-    display_name = None
-    desc = None
-    start_time = 0
-    end_time = 0
-
-    verdict = Verdict.PENDING
-    output = ""
-
     def __init__(self):
         self.name = None
-        self.display_name = None
         self.desc = None
         self.start_time = 0
         self.end_time = 0
@@ -85,22 +80,45 @@ class CiBase(ABC):
             self.end_timer()
         return self.end_time - self.start_time
 
-    def verdict_to_patchwork_state(self, verdict):
-        """
-        Convert verdict to patchwork state
-        """
-        if verdict == Verdict.PASS:
-            return 1
-        if verdict == Verdict.WARNING:
-            return 2
-        if verdict == Verdict.FAIL:
-            return 3
+    def log_err(self, msg):
+        utils.log_error(f"CI: {self.name}: {msg}")
 
-        return 0
+    def log_info(self, msg):
+        utils.log_info(f"CI: {self.name}: {msg}")
+
+    def log_dbg(self, msg):
+        utils.log_debug(f"CI: {self.name}: {msg}")
 
     @abstractmethod
     def run(self):
         """
         The child class should implement run() method
+        If the test fail, it should raise the EndTest exception
         """
         pass
+
+    @abstractmethod
+    def post_run(self):
+        """
+        The child class should implement post_run() method
+        """
+        pass
+
+
+def submit_pw_check(pw, patch, name, verdict, desc, url=None, dry_run=False):
+
+    utils.log_debug(f"Submitting the result to PW: dry_run={dry_run}")
+
+    if not dry_run:
+
+        state = 0
+
+        if verdict == Verdict.PASS:
+            state = 1
+        if verdict == Verdict.WARNING:
+            state = 2
+        if verdict == Verdict.FAIL:
+            state = 3
+
+        pw.post_check(patch, name, state, desc, url)
+

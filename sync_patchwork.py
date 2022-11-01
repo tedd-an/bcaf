@@ -9,12 +9,8 @@ import tempfile
 
 from github import Github
 
-
-from libs import init_logger, log_debug, log_error, log_info, cmd_run
-from libs import Patchwork
-from libs import GithubTool
-from libs import RepoTool
-from libs import EmailTool
+from libs import init_logger, log_debug, log_error, log_info
+from libs import Patchwork, GithubTool, RepoTool, EmailTool
 
 config = None
 pw = None
@@ -42,7 +38,7 @@ def init_github(repo):
     return GithubTool(repo, os.environ['GITHUB_TOKEN'])
 
 def init_src_repo(src_path):
-    return RepoTool(f"{os.path.basename(src_path)}", src_path, None)
+    return RepoTool("src_dir", src_path)
 
 def init_email(email_config):
     token = None
@@ -279,16 +275,13 @@ def series_check_patches(series):
     log_debug(f"Series PATH: {series_dir}")
 
     # Reset source branch to base branch
-    (ret, stdout, stderr) = src_repo.git_checkout(config['branch'])
-    if ret:
+    if src_repo.git_checkout(config['branch']):
         # No need to continue
         log_error(f"ERROR: Failed: git checkout {config['branch']}")
         return False
 
     # Create branch for series
-    (ret, stdout, stderr) = src_repo.git_checkout(f"{series['id']}",
-                                                  create_branch=True)
-    if ret:
+    if src_repo.git_checkout(f"{series['id']}", create_branch=True):
         log_error(f"ERROR: Failed: git checkout -b {series['id']}")
         return False
 
@@ -310,13 +303,12 @@ def series_check_patches(series):
         log_debug(f"Patch mbox saved to file: {patch_path}")
 
         # Apply patch
-        (ret, stdout, stderr) = src_repo.git_am(patch_path)
-        if ret:
+        if src_repo.git_am(patch_path):
             # git am failed. Update patchwork/checks and abort
             verdict = False
 
             # Update the contents for email body
-            content = stderr
+            content = src_repo.stderr
 
             src_repo.git_am(abort=True)
 
@@ -324,7 +316,7 @@ def series_check_patches(series):
                 log_info("Skip submitting the result to PW")
                 break
 
-            pw.post_check(patch['id'], "pre-ci_am", 3, stderr)
+            pw.post_check(patch['id'], "pre-ci_am", 3, content)
             break
 
         # git am success
@@ -348,8 +340,7 @@ def series_check_patches(series):
         return True
 
     # Create Pull Request
-    (ret, stdout, stderr) = src_repo.git_push(f"{series['id']}")
-    if ret:
+    if src_repo.git_push(f"{series['id']}"):
         log_error("Failed to push the source to Github")
         return False
 
