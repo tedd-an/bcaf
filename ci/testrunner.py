@@ -102,7 +102,7 @@ class TestRunner(Base):
 
                 submit_pw_check(self.pw, self.patch_1, self.name, Verdict.PASS,
                                 "TestRunner PASS", None, self.dry_run)
-                self.add_success(line)
+                self.success()
                 return
 
             if re.search(r"^Test Summary", line):

@@ -13,7 +13,8 @@ class IncrementalBuild(Base):
     This class build the targe after applying the each patch in the series
     """
 
-    def __init__(self, pw, series, space, src_dir, dry_run=False):
+    def __init__(self, pw, series, space, src_dir, kernel_config=None,
+                 dry_run=False):
 
         super().__init__()
 
@@ -24,11 +25,13 @@ class IncrementalBuild(Base):
         self.series = series
         self.dry_run = dry_run
         self.src_dir = src_dir
-
+        self.kernel_config = kernel_config
         self.space = space
+
         if self.space == "kernel":
             # Set the dry_run=True so it won't submit the result to the pw.
-            self.target = BuildKernel(pw, series, src_dir, dry_run=True)
+            self.target = BuildKernel(pw, series, src_dir, config=kernel_config,
+                                      dry_run=True)
         elif self.space == "user":
             _params = ["--disable-android"]
             # Set the dry_run=True so it won't submit the result to the pw.
@@ -100,8 +103,11 @@ class IncrementalBuild(Base):
             self.log_info("No verdict. skip post-run")
             return
 
-        # Clean the source
-        cmd = ["make", "maintainer-clean"]
+        if self.space == 'user':
+            cmd = ["make", "maintainer-clean"]
+        else: # kernel
+            cmd = ['make', 'clean']
+
         (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
         if ret:
             self.log_err("Fail to clean the source")

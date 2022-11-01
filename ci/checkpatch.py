@@ -11,7 +11,8 @@ class CheckPatch(Base):
     This class runs the checkpatch.pl with the patches in the series.
     """
 
-    def __init__(self, pw, series, src_dir, checkpatch_pl=None, dry_run=False):
+    def __init__(self, pw, series, src_dir, checkpatch_pl=None, ignore=None,
+                 dry_run=False):
 
         super().__init__()
 
@@ -28,6 +29,7 @@ class CheckPatch(Base):
         self.series = series
         self.dry_run = dry_run
         self.src_dir = src_dir
+        self.ignore = ignore
 
         self.log_dbg("Initialization completed")
 
@@ -72,10 +74,15 @@ class CheckPatch(Base):
         self.log_info(f"Test Verdict: {self.verdict.name}")
 
     def _checkpatch(self, patch):
+        cmd = [self.checkpatch_pl]
+        if self.ignore:
+            cmd.append('--ignore')
+            cmd.append(self.ignore)
+
         patch_file = self.pw.save_patch_mbox(patch['id'],
                             os.path.join(self.src_dir, f"{patch['id']}.patch"))
         self.log_dbg(f"Patch file: {patch_file}")
-        cmd = [self.checkpatch_pl, patch_file]
+        cmd.append(patch_file)
         return cmd_run(cmd, cwd=self.src_dir)
 
     def post_run(self):

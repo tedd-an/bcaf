@@ -79,13 +79,23 @@ def check_args(args):
         log_error(f"Invalid parameter(config) {args.config}")
         return False
 
-    if not os.path.exists(os.path.abspath(args.src_dir)):
-        log_error(f"Invalid parameter(src_dir) {args.src_dir}")
+    if not os.path.exists(os.path.abspath(args.bluez_dir)):
+        log_error(f"Invalid parameter(src_dir) {args.bluez_dir}")
         return False
 
     if not os.path.exists(os.path.abspath(args.ell_dir)):
         log_error(f"Invalid parameter(ell_dir) {args.ell_dir}")
         return False
+
+    if args.space == 'kernel':
+        # requires kernel_dir
+        if not args.kernel_dir:
+            log_error("Missing required parameter: kernel_dir")
+            return False
+
+        if not os.path.exists(os.path.abspath(args.kernel_dir)):
+            log_error(f"Invalid parameter(kernel_dir) {args.kernel_dir}")
+            return False
 
     return True
 
@@ -96,14 +106,18 @@ def parse_args():
     ap.add_argument('-b', '--branch', default='workflow',
                     help='Name of branch in base_repo where the PR is pushed. '
                          'Use <BRANCH> format. default: workflow')
-    ap.add_argument('-s', '--src-dir', default='./',
-                    help='BlueZ source directory. default=./')
-    ap.add_argument('-e', '--ell-dir', default='../ell',
-                    help='ELL source directory. default=../ell')
+    ap.add_argument('-z', '--bluez-dir', required=True,
+                    help='BlueZ source directory.')
+    ap.add_argument('-e', '--ell-dir', required=True,
+                    help='ELL source directory.')
+    ap.add_argument('-k', '--kernel-dir', default=None,
+                    help='Kernel source directory')
     ap.add_argument('-d', '--dry-run', action='store_true', default=False,
                     help='Run it without uploading the result. default=False')
 
     # Positional parameter
+    ap.add_argument('space', choices=['user', 'kernel'],
+                    help="user or kernel space")
     ap.add_argument("repo",
                     help="Name of Github repository. i.e. bluez/bluez")
     ap.add_argument('pr_num', type=int,
@@ -218,7 +232,7 @@ def report_ci(test_list):
     # Sending email
     send_email(summary + '\n' + results)
 
-def create_test_list():
+def create_test_list_user():
     # Setup CI tests
     # AR: Maybe read the test from config?
     #
@@ -233,42 +247,105 @@ def create_test_list():
     ########################################
 
     # CheckPatch
-    # test_list.append(ci.CheckPatch(pw, series, src_repo.path(), dry_run=dry_run))
+    test_list.append(ci.CheckPatch(pw, series, src_repo.path(), dry_run=dry_run))
 
     # GitLint
-    # test_list.append(ci.GitLint(pw, series, src_repo.path(), dry_run=dry_run))
+    test_list.append(ci.GitLint(pw, series, src_repo.path(), dry_run=dry_run))
 
     # BuildELL
-    # test_list.append(ci.BuildEll(pw, series, config['ell_dir'], dry_run=dry_run))
+    test_list.append(ci.BuildEll(pw, series, config['ell_dir'], dry_run=dry_run))
 
     # Build BlueZ
-    # test_list.append(ci.BuildBluez(pw, series, src_repo.path(), dry_run=dry_run))
+    test_list.append(ci.BuildBluez(pw, series, src_repo.path(), dry_run=dry_run))
 
     # Make Check
-    # test_list.append(ci.MakeCheck(pw, series, src_repo.path(), dry_run=dry_run))
+    test_list.append(ci.MakeCheck(pw, series, src_repo.path(), dry_run=dry_run))
 
     # Make distcheck
-    # test_list.append(ci.MakeDistcheck(pw, series, src_repo.path(), dry_run))
+    test_list.append(ci.MakeDistcheck(pw, series, src_repo.path(), dry_run))
 
     # Make check w/ Valgrind
-    # test_list.append(ci.CheckValgrind(pw, series, src_repo.path(), dry_run))
+    test_list.append(ci.CheckValgrind(pw, series, src_repo.path(), dry_run))
 
     # Make with Exteranl ELL
-    # test_list.append(ci.MakeExtEll(pw, series, src_repo.path(), dry_run))
+    test_list.append(ci.MakeExtEll(pw, series, src_repo.path(), dry_run))
 
     # Incremental Build
-    # test_list.append(ci.IncrementalBuild(pw, series, "user", src_repo.path(), dry_run))
+    test_list.append(ci.IncrementalBuild(pw, series, "user", src_repo.path(), dry_run))
 
     # Run ScanBuild
     test_list.append(ci.ScanBuild(pw, series, src_repo.path(), dry_run))
 
     return test_list
 
-def run_ci():
+def create_test_list_kernel():
+    # Setup CI tests for kernel test
+    # AR: Maybe read the test from config?
+    #
+    # These are the list of tests:
+    test_list = []
+    pr = gh.get_pr(config['pr_num'], force=True)
+    series = pw.get_series(pr_get_sid(pr.title))
+    dry_run = config['dry_run']
+    ci_config = config['space_details']['kernel']['ci']
+
+    ########################################
+    # Test List
+    ########################################
+
+    # CheckPatch
+    # If available, need to apply "ignore" flag
+    # checkaptch_pl = os.path.join(src_repo.path(), 'scripts', 'checkpatch.pl')
+    # test_list.append(ci.CheckPatch(pw, series, src_repo.path(), dry_run=dry_run,
+    #                  checkpatch_pl=checkaptch_pl,
+    #                  ignore=ci_config['CheckPatch']['ignore']))
+    # # GitLint
+    # test_list.append(ci.GitLint(pw, series, src_repo.path(), dry_run=dry_run))
+
+    # # SubjectPrefix
+    # test_list.append(ci.SubjectPrefix(pw, series, src_repo.path(), dry_run))
+
+    # # BuildKernel
+    # # Get the config from the bluez source tree
+    ci_config = os.path.join(config['bluez_dir'], "doc", "ci.config")
+    # test_list.append(ci.BuildKernel(pw, series, src_repo.path(),
+    #                  config=ci_config, dry_run=dry_run))
+
+    # # BuildKernel32
+    # test_list.append(ci.BuildKernel32(pw, series, src_repo.path(),
+    #                  config=ci_config, dry_run=dry_run))
+
+    # # TestRunnerSetup
+    # tester_config = os.path.join(config['bluez_dir'], "doc", "tester.config")
+    # test_list.append(ci.TestRunnerSetup(pw, series, src_repo.path(),
+    #                  bluez_src_dir=config['bluez_dir'],
+    #                  tester_config=tester_config, dry_run=dry_run))
+
+    # # TestRunner-*
+    # testrunner_list = ci_config['TestRunner']['tester-list']
+    # for runner in testrunner_list:
+    #     log_debug(f"Add {runner} instance to test_list")
+    #     test_list.append(ci.TestRunner(runner, pw, series,
+    #                      bluez_src_dir=config['bluez_dir'],
+    #                      src_dir=src_repo.path(),
+    #                      dry_run=dry_run))
+
+    # # Incremental Build
+    test_list.append(ci.IncrementalBuild(pw, series, "kernel", src_repo.path(),
+                                         config=ci_config, dry_run=dry_run))
+
+    return test_list
+
+def run_ci(space):
 
     num_fails = 0
 
-    test_list = create_test_list()
+    test_list = []
+    if space == 'user':
+        test_list = create_test_list_user()
+    else:
+        test_list = create_test_list_kernel()
+
     log_info(f"Test list is created: {len(test_list)}")
     log_debug("+--------------------------+")
     log_debug("|          Run CI          |")
@@ -323,9 +400,11 @@ def main():
     # Save the input arguments to config.
     config['branch'] = args.branch
     config['dry_run'] = args.dry_run
-    config['src_dir'] = args.src_dir
+    config['bluez_dir'] = args.bluez_dir
     config['ell_dir'] = args.ell_dir
+    config['kernel_dir'] = args.kernel_dir
     config['pr_num'] = args.pr_num
+    config['space'] = args.space
 
     pw = init_patchwork(config['patchwork'])
     if not pw:
@@ -335,7 +414,15 @@ def main():
     if not gh:
         sys.exit(1)
 
-    src_repo = init_src_repo(args.src_dir)
+    if args.space == "user":
+        main_src = args.bluez_dir
+    elif args.space == "kernel":
+        main_src = args.kernel_dir
+    else:
+        log_error(f"Invalid parameter(space) {args.space}")
+        sys.exit(1)
+
+    src_repo = init_src_repo(main_src)
     if not src_repo:
         sys.exit(1)
 
@@ -351,7 +438,7 @@ def main():
         log_error("Failed to fetch commits in the patches")
         sys.exit(1)
 
-    num_fails = run_ci()
+    num_fails = run_ci(args.space)
 
     log_debug("----- DONE -----")
 
