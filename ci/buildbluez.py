@@ -8,21 +8,24 @@ class BuildBluez(GenericBuild):
     class, it checks the verdict and reports the result.
     """
 
-    def __init__(self, pw, series, src_dir, config_params=None, dry_run=False):
+    def __init__(self, ci_data, src_dir=None, config_params=None, dry_run=None):
 
-        super().__init__(config_params=config_params, src_dir=src_dir)
-
-        # Common
         self.name = "BluezMake"
         self.desc = "Build BlueZ"
+        self.ci_data = ci_data
 
-        self.pw = pw
-        self.series = series
-        self.src_dir = src_dir
-        self.dry_run = dry_run
+        # Override the src_dir
+        self.src_dir = ci_data.src_dir
+        if src_dir:
+            self.log_dbg(f"Override src_dir {src_dir}")
+            self.src_dir = src_dir
 
-        # The first patch in the series
-        self.patch_1 = self.series['patches'][0]
+        self.dry_run = self.ci_data.config['dry_run']
+        if dry_run:
+            self.log_dbg(f"Override the dry_run flag: {dry_run}")
+            self.dry_run = dry_run
+
+        super().__init__(config_params=config_params, work_dir=self.src_dir)
 
         self.log_dbg("Initialization completed")
 
@@ -41,7 +44,8 @@ class BuildBluez(GenericBuild):
 
         # Report the result to Patchwork
         if self.verdict == Verdict.FAIL:
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
                             "BluezMake FAIL: " + self.output,
                             None, self.dry_run)
             # Test verdict and output is already set by the super().run().
@@ -49,8 +53,10 @@ class BuildBluez(GenericBuild):
             raise EndTest
 
         # Build success
-        submit_pw_check(self.pw, self.patch_1, self.name, Verdict.PASS,
-                        "Bluez Make PASS", None, self.dry_run)
+        submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                        self.name, Verdict.PASS,
+                        "Bluez Make PASS",
+                        None, self.dry_run)
         # Actually no need to call success() here. But add it here just for
         # reference
         self.success()

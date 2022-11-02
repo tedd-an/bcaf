@@ -11,27 +11,20 @@ class TestRunner(Base):
     """Test Runner class
     This class runs the test-runner with the test targer
     """
-    def __init__(self, test_name, pw, series, bluez_src_dir, src_dir,
-                 dry_run=False):
-
-        super().__init__()
+    def __init__(self, ci_data, test_name, bluez_src_dir):
 
         # Common
         self.name = f"TestRunner_{test_name}"
         self.desc = f"Run {test_name} with test-runner"
-
-        self.pw = pw
-        self.series = series
-        self.dry_run = dry_run
-        self.src_dir = src_dir
+        self.ci_data = ci_data
         self.bluez_src_dir = bluez_src_dir
-
-        self.patch_1 = self.series['patches'][0]
 
         self.test_name = test_name
         self.test_runner = os.path.join(bluez_src_dir, "tools/test-runner")
-        self.test_img = os.path.join(src_dir, "arch/x86/boot/bzImage")
+        self.test_img = os.path.join(self.ci_data.src_dir, "arch/x86/boot/bzImage")
         self.test_summary = None
+
+        super().__init__()
 
         self.log_dbg("Initialization completed")
 
@@ -58,8 +51,10 @@ class TestRunner(Base):
         tester_path = os.path.join(self.bluez_src_dir, "tools", self.test_name)
         if not os.path.exists(tester_path):
             self.log_err(f"No tester found: {tester_path}")
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
-                            "No tester found", None, self.dry_run)
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            "No tester found",
+                            None, self.ci_data.config['dry_run'])
             self.add_failure_end_test("No tester found")
 
         # Running tester
@@ -67,8 +62,10 @@ class TestRunner(Base):
         (ret, stdout, stderr) = cmd_run(cmd, cwd=self.bluez_src_dir)
         if ret:
             self.log_err("Test failed to run")
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
-                            stderr, None, self.dry_run)
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            stderr,
+                            None, self.ci_data.config['dry_run'])
             self.add_failure_end_test(stderr)
 
         # Process the result
@@ -84,10 +81,10 @@ class TestRunner(Base):
                 result = self.parse_result(line)
                 if result["failed"] != "0":
                     self.log_dbg("Some test failed")
-                    submit_pw_check(self.pw, self.patch_1, self.name,
-                                    Verdict.FAIL,
+                    submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                                    self.name, Verdict.FAIL,
                                     f"{self.name}: {line}",
-                                    None, self.dry_run)
+                                    None, self.ci_data.config['dry_run'])
                     self.add_failure(line)
 
                     # Adding Failed test cases
@@ -100,8 +97,10 @@ class TestRunner(Base):
                     check_fail = False
                     raise EndTest
 
-                submit_pw_check(self.pw, self.patch_1, self.name, Verdict.PASS,
-                                "TestRunner PASS", None, self.dry_run)
+                submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                                self.name, Verdict.PASS,
+                                "TestRunner PASS",
+                                None, self.ci_data.config['dry_run'])
                 self.success()
                 return
 

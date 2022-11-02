@@ -3,3 +3,4 @@ from .patchwork import Patchwork, PostException
 from .email import EmailTool
 from .repotool import RepoTool
 from .githubtool import GithubTool
+from .context import Context

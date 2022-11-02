@@ -2,76 +2,12 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
-import json
-import re
 import argparse
-import tempfile
 
 from libs import init_logger, log_debug, log_error, log_info, pr_get_sid
-from libs import Patchwork, GithubTool, RepoTool, EmailTool
+from libs import Context
 
 import ci
-
-config = None
-pw = None
-gh = None
-src_repo = None
-email = None
-
-def init_config(config_file):
-
-    config = None
-
-    log_debug(f"Loading config file: {config_file}")
-    with open(os.path.abspath(config_file), 'r') as f:
-        config = json.load(f)
-
-    return config
-
-def init_patchwork(pw_config):
-    try:
-        ret = Patchwork(pw_config['url'], pw_config['project_name'])
-    except ValueError as e:
-        log_error("Failed to initialize Patchwork class")
-        return None
-
-    log_debug("Initialized Patchwork object")
-    return ret
-
-def init_github(repo):
-    if 'GITHUB_TOKEN' not in os.environ:
-        log_error("Set GITHUB_TOKEN environment variable")
-        return None
-
-    try:
-        ret = GithubTool(repo, os.environ['GITHUB_TOKEN'])
-    except:
-        log_error("Failed to initialize GithubTool class")
-        return None
-
-    log_debug("Initialized GithubTool object")
-
-    return ret
-
-def init_src_repo(src_dir):
-    try:
-        log_debug(f"SRC: {src_dir}")
-        ret = RepoTool("src_dir", src_dir)
-    except:
-        log_error("Failed to initialize RepoTool class")
-        return None
-
-    log_debug("Initialized RepoTool object")
-
-    return ret
-
-def init_email(email_config):
-    token = None
-
-    if 'EMAIL_TOKEN' in os.environ:
-        token = os.environ['EMAIL_TOKEN']
-
-    return EmailTool(token=token, config=email_config)
 
 def check_args(args):
 
@@ -144,9 +80,9 @@ Linux Bluetooth
 
 '''
 
-def github_pr_post_result(test):
+def github_pr_post_result(ci_data, test):
 
-    pr = gh.get_pr(config['pr_num'], force=True)
+    pr = ci_data.gh.get_pr(ci_data.config['pr_num'], force=True)
 
     comment = f"**{test.name}**\n"
     comment += f"Desc: {test.desc}\n"
@@ -156,7 +92,7 @@ def github_pr_post_result(test):
     if test.output:
         comment += f"Output:\n```\n{test.output}\n```"
 
-    return gh.pr_post_comment(pr, comment)
+    return ci_data.gh.pr_post_comment(pr, comment)
 
 def is_maintainers_only(email_config):
     if 'only-maintainers' in email_config and email_config['only-maintainers']:
@@ -177,34 +113,31 @@ def get_receivers(email_config, submitter):
 
     return receivers
 
-def send_email(content):
+def send_email(ci_data, content):
     headers = {}
-    email_config = config['email']
+    email_config = ci_data.config['email']
 
-    pr = gh.get_pr(config['pr_num'], force=True)
-    series_id = pr_get_sid(pr.title)
-    series = pw.get_series(series_id)
-    patch_1 = series['patches'][0]
-    body = EMAIL_MESSAGE.format(pw_link=series['web_url'], content=content)
+    body = EMAIL_MESSAGE.format(pw_link=ci_data.series['web_url'],
+                                content=content)
 
-    headers['In-Reply-To'] = patch_1['msgid']
-    headers['References'] = patch_1['msgid']
+    headers['In-Reply-To'] = ci_data.patch_1['msgid']
+    headers['References'] = ci_data.patch_1['msgid']
 
     if not is_maintainers_only(email_config):
         headers['Reply-To'] = email_config['default-to']
 
-    receivers = get_receivers(email_config, series['submitter']['email'])
-    email.set_receivers(receivers)
-    email.compose("RE: " + series['name'], body, headers)
+    receivers = get_receivers(email_config, ci_data.series['submitter']['email'])
+    ci_data.email.set_receivers(receivers)
+    ci_data.email.compose("RE: " + ci_data.series['name'], body, headers)
 
-    if config['dry_run']:
+    if ci_data.config['dry_run']:
         log_info("Dry-Run is set. Skip sending email")
         return
 
     log_info("Sending Email...")
-    email.send()
+    ci_data.email.send()
 
-def report_ci(test_list):
+def report_ci(ci_data, test_list):
     """Generate the CI result and send email"""
     results = ""
     summary = "Test Summary:\n"
@@ -230,64 +163,58 @@ def report_ci(test_list):
         results = "Details\n" + results
 
     # Sending email
-    send_email(summary + '\n' + results)
+    send_email(ci_data, summary + '\n' + results)
 
-def create_test_list_user():
+def create_test_list_user(ci_data):
     # Setup CI tests
     # AR: Maybe read the test from config?
     #
     # These are the list of tests:
     test_list = []
-    pr = gh.get_pr(config['pr_num'], force=True)
-    series = pw.get_series(pr_get_sid(pr.title))
-    dry_run = config['dry_run']
 
     ########################################
     # Test List
     ########################################
 
     # CheckPatch
-    test_list.append(ci.CheckPatch(pw, series, src_repo.path(), dry_run=dry_run))
+    test_list.append(ci.CheckPatch(ci_data))
 
     # GitLint
-    test_list.append(ci.GitLint(pw, series, src_repo.path(), dry_run=dry_run))
+    test_list.append(ci.GitLint(ci_data))
 
     # BuildELL
-    test_list.append(ci.BuildEll(pw, series, config['ell_dir'], dry_run=dry_run))
+    test_list.append(ci.BuildEll(ci_data))
 
     # Build BlueZ
-    test_list.append(ci.BuildBluez(pw, series, src_repo.path(), dry_run=dry_run))
+    test_list.append(ci.BuildBluez(ci_data))
 
     # Make Check
-    test_list.append(ci.MakeCheck(pw, series, src_repo.path(), dry_run=dry_run))
+    test_list.append(ci.MakeCheck(ci_data))
 
     # Make distcheck
-    test_list.append(ci.MakeDistcheck(pw, series, src_repo.path(), dry_run))
+    test_list.append(ci.MakeDistcheck(ci_data))
 
     # Make check w/ Valgrind
-    test_list.append(ci.CheckValgrind(pw, series, src_repo.path(), dry_run))
+    test_list.append(ci.CheckValgrind(ci_data))
 
     # Make with Exteranl ELL
-    test_list.append(ci.MakeExtEll(pw, series, src_repo.path(), dry_run))
+    test_list.append(ci.MakeExtEll(ci_data))
 
     # Incremental Build
-    test_list.append(ci.IncrementalBuild(pw, series, "user", src_repo.path(), dry_run))
+    test_list.append(ci.IncrementalBuild(ci_data, "user"))
 
     # Run ScanBuild
-    test_list.append(ci.ScanBuild(pw, series, src_repo.path(), dry_run))
+    test_list.append(ci.ScanBuild(ci_data))
 
     return test_list
 
-def create_test_list_kernel():
+def create_test_list_kernel(ci_data):
     # Setup CI tests for kernel test
     # AR: Maybe read the test from config?
     #
     # These are the list of tests:
     test_list = []
-    pr = gh.get_pr(config['pr_num'], force=True)
-    series = pw.get_series(pr_get_sid(pr.title))
-    dry_run = config['dry_run']
-    ci_config = config['space_details']['kernel']['ci']
+    ci_config = ci_data.config['space_details']['kernel']['ci']
 
     ########################################
     # Test List
@@ -295,56 +222,51 @@ def create_test_list_kernel():
 
     # CheckPatch
     # If available, need to apply "ignore" flag
-    # checkaptch_pl = os.path.join(src_repo.path(), 'scripts', 'checkpatch.pl')
-    # test_list.append(ci.CheckPatch(pw, series, src_repo.path(), dry_run=dry_run,
-    #                  checkpatch_pl=checkaptch_pl,
-    #                  ignore=ci_config['CheckPatch']['ignore']))
-    # # GitLint
-    # test_list.append(ci.GitLint(pw, series, src_repo.path(), dry_run=dry_run))
+    checkaptch_pl = os.path.join(ci_data.src_dir, 'scripts', 'checkpatch.pl')
+    test_list.append(ci.CheckPatch(ci_data, checkpatch_pl=checkaptch_pl,
+                     ignore=ci_config['CheckPatch']['ignore']))
+    # GitLint
+    test_list.append(ci.GitLint(ci_data))
 
-    # # SubjectPrefix
-    # test_list.append(ci.SubjectPrefix(pw, series, src_repo.path(), dry_run))
+    # SubjectPrefix
+    test_list.append(ci.SubjectPrefix(ci_data))
 
-    # # BuildKernel
-    # # Get the config from the bluez source tree
-    ci_config = os.path.join(config['bluez_dir'], "doc", "ci.config")
-    # test_list.append(ci.BuildKernel(pw, series, src_repo.path(),
-    #                  config=ci_config, dry_run=dry_run))
+    # BuildKernel
+    # Get the config from the bluez source tree
+    kernel_config = os.path.join(ci_data.config['bluez_dir'], "doc", "ci.config")
+    test_list.append(ci.BuildKernel(ci_data, kernel_config=kernel_config))
 
-    # # BuildKernel32
-    # test_list.append(ci.BuildKernel32(pw, series, src_repo.path(),
-    #                  config=ci_config, dry_run=dry_run))
+    # BuildKernel32
+    test_list.append(ci.BuildKernel32(ci_data, kernel_config=kernel_config))
 
-    # # TestRunnerSetup
-    # tester_config = os.path.join(config['bluez_dir'], "doc", "tester.config")
-    # test_list.append(ci.TestRunnerSetup(pw, series, src_repo.path(),
-    #                  bluez_src_dir=config['bluez_dir'],
-    #                  tester_config=tester_config, dry_run=dry_run))
+    # TestRunnerSetup
+    tester_config = os.path.join(ci_data.config['bluez_dir'],
+                                 "doc", "tester.config")
+    test_list.append(ci.TestRunnerSetup(ci_data, tester_config=tester_config,
+                     bluez_src_dir=ci_data.config['bluez_dir']))
 
-    # # TestRunner-*
-    # testrunner_list = ci_config['TestRunner']['tester-list']
-    # for runner in testrunner_list:
-    #     log_debug(f"Add {runner} instance to test_list")
-    #     test_list.append(ci.TestRunner(runner, pw, series,
-    #                      bluez_src_dir=config['bluez_dir'],
-    #                      src_dir=src_repo.path(),
-    #                      dry_run=dry_run))
+    # TestRunner-*
+    testrunner_list = ci_config['TestRunner']['tester-list']
+    for runner in testrunner_list:
+        log_debug(f"Add {runner} instance to test_list")
+        test_list.append(ci.TestRunner(ci_data, runner,
+                         bluez_src_dir=ci_data.config['bluez_dir']))
 
     # # Incremental Build
-    test_list.append(ci.IncrementalBuild(pw, series, "kernel", src_repo.path(),
-                                         config=ci_config, dry_run=dry_run))
+    test_list.append(ci.IncrementalBuild(ci_data, "kernel",
+                                         kernel_config=kernel_config))
 
     return test_list
 
-def run_ci(space):
+def run_ci(ci_data):
 
     num_fails = 0
 
     test_list = []
-    if space == 'user':
-        test_list = create_test_list_user()
+    if ci_data.config['space'] == 'user':
+        test_list = create_test_list_user(ci_data)
     else:
-        test_list = create_test_list_kernel()
+        test_list = create_test_list_kernel(ci_data)
 
     log_info(f"Test list is created: {len(test_list)}")
     log_debug("+--------------------------+")
@@ -367,20 +289,20 @@ def run_ci(space):
         if test.verdict != ci.Verdict.PASS:
             num_fails += 1
 
-        if config['dry_run']:
+        if ci_data.config['dry_run']:
             log_info("Skip submitting result to Github: dry_run=True")
             continue
 
         log_debug("Submit the result to github")
         # AR: Submit the result to GH
-        if not github_pr_post_result(test):
+        if not github_pr_post_result(ci_data, test):
             log_error("Failed to submit the result to Github")
 
     log_info(f"Total number of failed test: {num_fails}")
     log_debug("+--------------------------+")
     log_debug("|        ReportCI          |")
     log_debug("+--------------------------+")
-    report_ci(test_list)
+    report_ci(ci_data, test_list)
 
     return num_fails
 
@@ -393,27 +315,6 @@ def main():
     if not check_args(args):
         sys.exit(1)
 
-    config = init_config(os.path.abspath(args.config))
-    if not config:
-        sys.exit(1)
-
-    # Save the input arguments to config.
-    config['branch'] = args.branch
-    config['dry_run'] = args.dry_run
-    config['bluez_dir'] = args.bluez_dir
-    config['ell_dir'] = args.ell_dir
-    config['kernel_dir'] = args.kernel_dir
-    config['pr_num'] = args.pr_num
-    config['space'] = args.space
-
-    pw = init_patchwork(config['patchwork'])
-    if not pw:
-        sys.exit(1)
-
-    gh = init_github(args.repo)
-    if not gh:
-        sys.exit(1)
-
     if args.space == "user":
         main_src = args.bluez_dir
     elif args.space == "kernel":
@@ -422,23 +323,27 @@ def main():
         log_error(f"Invalid parameter(space) {args.space}")
         sys.exit(1)
 
-    src_repo = init_src_repo(main_src)
-    if not src_repo:
-        sys.exit(1)
-
-    email = init_email(config['email'])
+    ci_data = Context(config_file=os.path.abspath(args.config),
+                      github_repo=args.repo,
+                      src_dir=main_src,
+                      branch=args.branch, dry_run=args.dry_run,
+                      bluez_dir=args.bluez_dir, ell_dir=args.ell_dir,
+                      kernel_dir=args.kernel_dir, pr_num=args.pr_num,
+                      space=args.space)
 
     # Setup Source for the test that needs to access the base like incremental
     # build.
     # It needs to fetch the extra patches: # of commit in PR + 1
-    pr = gh.get_pr(args.pr_num, force=True)
-
+    pr = ci_data.gh.get_pr(args.pr_num, force=True)
     cmd = ['fetch', f'--depth={pr.commits+1}']
-    if src_repo.git(cmd):
+    if ci_data.src_repo.git(cmd):
         log_error("Failed to fetch commits in the patches")
         sys.exit(1)
 
-    num_fails = run_ci(args.space)
+    # Get the patchwork series data and save in CI data
+    ci_data.update_series(ci_data.pw.get_series(pr_get_sid(pr.title)))
+
+    num_fails = run_ci(ci_data)
 
     log_debug("----- DONE -----")
 

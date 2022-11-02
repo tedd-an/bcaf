@@ -15,12 +15,12 @@ class GenericBuild(Base):
     def __init__(self, config_cmd=None, config_params=None,
                  make_cmd=None, make_params=None,
                  use_fakeroot=False, install=False, install_params=None,
-                 src_dir=None):
+                 work_dir=None):
 
         super().__init__()
 
         # This class specific
-        self.src_dir = src_dir
+        self.work_dir = work_dir
         self.use_fakeroot = use_fakeroot
 
         if config_cmd:
@@ -49,7 +49,7 @@ class GenericBuild(Base):
         cmd = [self.config_cmd]
         if self.config_params:
             cmd = cmd + self.config_params
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.work_dir)
         if ret:
             self.log_err(f"GenericBuild: Configure failed: {ret}")
             self.add_failure_end_test(stderr)
@@ -61,7 +61,7 @@ class GenericBuild(Base):
             cmd = ["fakeroot"] + cmd
         if self.make_params:
             cmd = cmd + self.make_params
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.work_dir)
         if ret:
             self.log_err(f"GenericBuild: Make failed: {ret}")
             self.add_failure_end_test(stderr)
@@ -71,7 +71,7 @@ class GenericBuild(Base):
             cmd = [self.make_cmd, "install"]
             if self.install_params:
                 cmd = cmd + [self.install_params]
-            (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+            (ret, stdout, stderr) = cmd_run(cmd, cwd=self.work_dir)
             if ret:
                 self.log_err(f"GenericBuild: Install failed: {ret}")
                 self.add_failure_end_test(stderr)

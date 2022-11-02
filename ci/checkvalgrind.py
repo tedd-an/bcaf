@@ -14,26 +14,20 @@ class CheckValgrind(GenericBuild):
     build the source, so it expects the source is clean
     """
 
-    def __init__(self, pw, series, src_dir, dry_run=False):
+    def __init__(self, ci_data):
         # For valgrind check, use the following config params to disable the
         # lsan and asan
         # config: --disable-lsan --disable-asan
 
-        config_params = ["--disable-lsan", "--disable-asan"]
-        make_params = ["check"]
-        super().__init__(config_params=config_params, make_params=make_params,
-                         src_dir=src_dir)
-
         # Common
         self.name = "CheckValgrind"
         self.desc = "Run Bluez Make Check with Valgrind"
+        self.ci_data = ci_data
 
-        self.pw = pw
-        self.series = series
-        self.dry_run = dry_run
-        self.src_dir = src_dir
-
-        self.patch_1 = self.series['patches'][0]
+        config_params = ["--disable-lsan", "--disable-asan"]
+        make_params = ["check"]
+        super().__init__(config_params=config_params, make_params=make_params,
+                         work_dir=ci_data.src_dir)
 
         self.log_dbg("Initialization completed")
 
@@ -49,16 +43,19 @@ class CheckValgrind(GenericBuild):
 
         # Report the result to Patchwork
         if self.verdict == Verdict.FAIL:
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
                             "Check Valgrind FAIL: " + self.output,
-                            None, self.dry_run)
+                            None, self.ci_data.config["dry_run"])
             # Test verdict and output is already set by the super().run().
             # Just raise the EndTest enough
             raise EndTest
 
         # Build success
-        submit_pw_check(self.pw, self.patch_1, self.name, Verdict.PASS,
-                        "Check Valgrind PASS", None, self.dry_run)
+        submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                        self.name, Verdict.PASS,
+                        "Check Valgrind PASS",
+                        None, self.ci_data.config["dry_run"])
         # Actually no need to call success() here. But add it here just for
         # reference
         self.success()
@@ -72,7 +69,7 @@ class CheckValgrind(GenericBuild):
 
         # Clean the source
         cmd = ["make", "maintainer-clean"]
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.ci_data.src_dir)
         if ret:
             self.log_err("Fail to clean the source")
 

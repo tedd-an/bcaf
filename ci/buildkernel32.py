@@ -17,28 +17,28 @@ class BuildKernel32(Base):
     enables all Bluetooth features.
     """
 
-    def __init__(self, pw, series, src_dir, config=None, dry_run=False,
-                 simple_build=True):
-
-        super().__init__()
+    def __init__(self, ci_data, kernel_config=None, simple_build=True,
+                 dry_run=None):
 
         # Common
         self.name = "BuildKernel32"
         self.desc = "Build 32bit Kernel for Bluetooth"
+        self.simple_build = simple_build
+        self.ci_data = ci_data
 
         # Set the default build config.
-        if config:
-            self.config = config
+        if kernel_config:
+            self.kernel_config = kernel_config
         else:
-            self.config = '/bluetooth_build.config'
+            self.kernel_config = '/bluetooth_build.config'
 
-        self.pw = pw
-        self.series = series
-        self.dry_run = dry_run
-        self.src_dir = src_dir
-        self.simple_build = simple_build
+        # Override the dry_run flag.
+        self.dry_run = self.ci_data.config['dry_run']
+        if dry_run:
+            self.log_dbg(f"Override the dry_run flag: {dry_run}")
+            self.dry_run = dry_run
 
-        self.patch_1 = self.series['patches'][0]
+        super().__init__()
 
         self.log_dbg("Initialization completed")
 
@@ -48,16 +48,19 @@ class BuildKernel32(Base):
         self.start_timer()
 
         # Copy the build config to source dir
-        self.log_info(f"Copying {self.config} to source dir")
-        shutil.copy(self.config, os.path.join(self.src_dir, ".config"))
+        self.log_info(f"Copying {self.kernel_config} to source dir")
+        shutil.copy(self.kernel_config, os.path.join(self.ci_data.src_dir,
+                                              ".config"))
 
         # Update .config
         self.log_info("Run make ARCH=i386 olddefconfig")
         cmd = ["make", "ARCH=i386", "olddefconfig"]
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd,
+                                        cwd=self.ci_data.src_dir)
         if ret:
             self.log_err("Failed to config the kernel")
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
                             "BuildKernel32: make olddefconfig FAIL: " + stderr,
                             None, self.dry_run)
             self.add_failure_end_test(stderr)
@@ -67,17 +70,22 @@ class BuildKernel32(Base):
         if self.simple_build:
             self.log_info("Simple build - Bluetooth only")
             cmd = ["make", "ARCH=i386", "-j2", "W=1", "net/bluetooth/"]
-            (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+            (ret, stdout, stderr) = cmd_run(cmd,
+                                            cwd=self.ci_data.src_dir)
+
             if ret:
-                submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
+                submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                                self.name, Verdict.FAIL,
                                 "BuildKernel32: make FAIL: " + stderr,
                                 None, self.dry_run)
                 self.add_failure_end_test(stderr)
 
             cmd = ["make", "ARCH=i386", "-j2", "W=1", "drivers/bluetooth/"]
-            (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+            (ret, stdout, stderr) = cmd_run(cmd,
+                                            cwd=self.ci_data.src_dir)
             if ret:
-                submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
+                submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                                self.name, Verdict.FAIL,
                                 "BuildKernel32: make FAIL: " + stderr,
                                 None, self.dry_run)
                 self.add_failure_end_test(stderr)
@@ -85,15 +93,19 @@ class BuildKernel32(Base):
             # full build
             self.log_info("Full build")
             cmd = ["make", "ARCH=i386", "-j2"]
-            (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+            (ret, stdout, stderr) = cmd_run(cmd,
+                                            cwd=self.ci_data.src_dir)
             if ret:
-                submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
+                submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                                self.name, Verdict.FAIL,
                                 "BuildKernel32: make FAIL: " + stderr,
                                 None, self.dry_run)
                 self.add_failure_end_test(stderr)
 
-        submit_pw_check(self.pw, self.patch_1, self.name, Verdict.PASS,
-                            "BuildKernel32 PASS", None, self.dry_run)
+        submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                        self.name, Verdict.PASS,
+                        "BuildKernel32 PASS",
+                        None, self.dry_run)
         self.success()
 
     def post_run(self):

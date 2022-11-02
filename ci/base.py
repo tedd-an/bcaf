@@ -27,8 +27,6 @@ class Base(ABC):
     Base class for CI Tests.
     """
     def __init__(self):
-        self.name = None
-        self.desc = None
         self.start_time = 0
         self.end_time = 0
         self.verdict = Verdict.PENDING

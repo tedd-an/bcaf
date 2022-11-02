@@ -11,20 +11,14 @@ class MakeCheck(Base):
     is already compiled
     """
 
-    def __init__(self, pw, series, src_dir, dry_run=False):
-
-        super().__init__()
+    def __init__(self, ci_data):
 
         # Common
         self.name = "MakeCheck"
         self.desc = "Run Bluez Make Check"
+        self.ci_data = ci_data
 
-        self.pw = pw
-        self.series = series
-        self.dry_run = dry_run
-        self.src_dir = src_dir
-
-        self.patch_1 = self.series['patches'][0]
+        super().__init__()
 
         self.log_dbg("Initialization completed")
 
@@ -34,17 +28,20 @@ class MakeCheck(Base):
         self.start_timer()
 
         cmd = ["make", "check"]
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.ci_data.src_dir)
         if ret:
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
                             "BlueZ Make Check FAIL: " + self.output,
-                            None, self.dry_run)
+                            None, self.ci_data.config['dry_run'])
             self.log_dbg("Test result FAIL")
             self.add_failure_end_test(stderr)
 
         # Build success
-        submit_pw_check(self.pw, self.patch_1, self.name, Verdict.PASS,
-                        "Bluez Make Check PASS", None, self.dry_run)
+        submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                        self.name, Verdict.PASS,
+                        "Bluez Make Check PASS",
+                        None, self.ci_data.config['dry_run'])
         self.success()
         self.log_dbg("Test result PASS")
 
@@ -57,7 +54,7 @@ class MakeCheck(Base):
 
         # Clean the source
         cmd = ["make", "maintainer-clean"]
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.ci_data.src_dir)
         if ret:
             self.log_err("Fail to clean the source")
 

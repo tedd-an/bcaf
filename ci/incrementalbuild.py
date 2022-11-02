@@ -13,35 +13,28 @@ class IncrementalBuild(Base):
     This class build the targe after applying the each patch in the series
     """
 
-    def __init__(self, pw, series, space, src_dir, kernel_config=None,
-                 dry_run=False):
-
-        super().__init__()
+    def __init__(self, ci_data, space, kernel_config=None):
 
         self.name = "IncrementalBuild"
         self.desc = "Incremental build with the patches in the series"
 
-        self.pw = pw
-        self.series = series
-        self.dry_run = dry_run
-        self.src_dir = src_dir
         self.kernel_config = kernel_config
         self.space = space
+        self.ci_data = ci_data
 
         if self.space == "kernel":
             # Set the dry_run=True so it won't submit the result to the pw.
-            self.target = BuildKernel(pw, series, src_dir, config=kernel_config,
+            self.target = BuildKernel(self.ci_data, kernel_config=kernel_config,
                                       dry_run=True)
         elif self.space == "user":
             _params = ["--disable-android"]
             # Set the dry_run=True so it won't submit the result to the pw.
-            self.target = BuildBluez(pw, series, src_dir, config_params=_params,
+            self.target = BuildBluez(self.ci_data, config_params=_params,
                                      dry_run=True)
         else:
             self.target = None
 
-        self.log_dbg(f"SRC: {src_dir}")
-        self.src_repo = RepoTool("src_dir", src_dir)
+        super().__init__()
 
         self.log_dbg("Initialization completed")
 
@@ -55,24 +48,25 @@ class IncrementalBuild(Base):
             self.add_failure_end_test("Invalid setup")
 
         # Make the source base to workflow branch
-        if self.src_repo.git_checkout("origin/workflow"):
-            self.log_err(f"Failed to checkout: {self.src_repo.stderr}")
-            self.add_failure_end_test(self.src_repo.stderr)
+        if self.ci_data.src_repo.git_checkout("origin/workflow"):
+            self.log_err(f"Failed to checkout: {self.ci_data.src_repo.stderr}")
+            self.add_failure_end_test(self.ci_data.src_repo.stderr)
 
         # Get patches from patchwork series
-        for patch in self.series['patches']:
+        for patch in self.ci_data.series['patches']:
             self.log_dbg(f"Patch ID: {patch['id']}")
 
             # Save patch mbox to file
-            patch_file = self.pw.save_patch_mbox(patch['id'],
-                            os.path.join(self.src_dir, f"{patch['id']}.patch"))
+            patch_file = self.ci_data.pw.save_patch_mbox(patch['id'],
+                            os.path.join(self.ci_data.src_dir,
+                                         f"{patch['id']}.patch"))
             self.log_dbg(f"Save patch: {patch_file}")
 
             # Apply patch
-            if self.src_repo.git_am(patch_file):
+            if self.ci_data.src_repo.git_am(patch_file):
                 self.log_err("Failed to apply patch")
-                msg = self.src_repo.stderr
-                self.src_repo.git_am(abort=True)
+                msg = self.ci_data.src_repo.stderr
+                self.ci_data.src_repo.git_am(abort=True)
                 self.add_failure_end_test(msg)
 
             # Test Build
@@ -87,13 +81,17 @@ class IncrementalBuild(Base):
             if self.target.verdict == Verdict.FAIL:
                 # submit error log pw
                 msg = f"{patch['name']}\n{self.target.output}"
-                submit_pw_check(self.pw, patch, self.name, Verdict.FAIL,
-                                msg, None, self.dry_run)
+                submit_pw_check(self.ci_data.pw, patch,
+                                self.name, Verdict.FAIL,
+                                msg,
+                                None, self.ci_data.config['dry_run'])
                 self.add_failure_end_test(msg)
 
             # Build Passed
-            submit_pw_check(self.pw, patch, self.name, Verdict.PASS,
-                            "Incremental Build PASS", None, self.dry_run)
+            submit_pw_check(self.ci_data.pw, patch,
+                            self.name, Verdict.PASS,
+                            "Incremental Build PASS",
+                            None, self.ci_data.config['dry_run'])
             self.success()
 
     def post_run(self):
@@ -108,7 +106,7 @@ class IncrementalBuild(Base):
         else: # kernel
             cmd = ['make', 'clean']
 
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.ci_data.src_dir)
         if ret:
             self.log_err("Fail to clean the source")
 

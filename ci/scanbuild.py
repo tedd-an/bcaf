@@ -12,22 +12,14 @@ class ScanBuild(Base):
     This class runs the scan-build and reports any issue found by the scan-build
     """
 
-    def __init__(self, pw, series,  src_dir, dry_run=False):
-
-        super().__init__()
+    def __init__(self, ci_data):
 
         # Common
         self.name = "ScanBuild"
         self.desc = "Run Scan Build"
+        self.ci_data = ci_data
 
-        self.pw = pw
-        self.series = series
-        self.dry_run = dry_run
-        self.src_dir = src_dir
-
-        self.patch_1 = self.series['patches'][0]
-
-        self.src_repo = RepoTool("src_dir", src_dir)
+        super().__init__()
 
         self.log_dbg("Initialization completed")
 
@@ -37,61 +29,73 @@ class ScanBuild(Base):
         self.start_timer()
 
         # Create the temp branch (HEAD) to come back later
-        if self.src_repo.git_checkout("patched", create_branch=True):
+        if self.ci_data.src_repo.git_checkout("patched", create_branch=True):
             self.log_err("Failed to create branch")
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
-                            "Setup failed", None, self.dry_run)
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            "Setup failed",
+                            None, self.ci_data.config['dry_run'])
             self.add_failure_end_test("Setup failed")
 
         # Checkout the source to the base where it has no patches applied
-        if self.src_repo.git_checkout("origin/workflow"):
+        if self.ci_data.src_repo.git_checkout("origin/workflow"):
             self.log_err("Failed to checkout to base branch")
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
-                            "Setup failed", None, self.dry_run)
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            "Setup failed",
+                            None, self.ci_data.config['dry_run'])
             self.add_failure_end_test("Setup failed")
 
         # Configure the build for base
         cmd = ["./bootstrap-configure", "--disable-asan", "--disable-lsan",
                "--disable-ubsan", "--disable-android"]
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.ci_data.src_dir)
         if ret:
             self.log_err("Build config failed")
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
-                            "Build Config FAIL", None, self.dry_run)
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            "Build Config FAIL",
+                            None, self.ci_data.config['dry_run'])
             self.add_failure_end_test(stderr)
 
         # Scan Build Make
         cmd = ["scan-build", "make", "-j2"]
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.ci_data.src_dir)
         if ret:
             self.log_err("Scan Build failed")
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
-                            "Scan Build FAIL", None, self.dry_run)
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            "Scan Build FAIL",
+                            None, self.ci_data.config['dry_run'])
             self.add_failure_end_test(stderr)
 
         # Save the stderr for later use
-        base_err_file = os.path.join(self.src_dir, "scan_build_base.err")
+        base_err_file = os.path.join(self.ci_data.src_dir, "scan_build_base.err")
         with open(base_err_file, 'w+') as f:
             f.write(stderr)
         self.log_dbg(f"Saved output for base build: {base_err_file}")
 
         # Now checked out the patched branch
-        if self.src_repo.git_checkout("patched"):
+        if self.ci_data.src_repo.git_checkout("patched"):
             self.log_err(f"Failed to checkout to patched branch")
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
-                            "Setup failed", None, self.dry_run)
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            "Setup failed",
+                            None, self.ci_data.config['dry_run'])
             self.add_failure_end_test("Setup failed")
 
         # Run scan build again with patched branch
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.ci_data.src_dir)
         if ret:
             self.log_err("Scan Build failed")
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.FAIL,
-                            "Scan Build FAIL", None, self.dry_run)
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            "Scan Build FAIL",
+                            None, self.ci_data.config['dry_run'])
             self.add_failure_end_test(stderr)
 
         # Save the stderr
-        patched_err_file = os.path.join(self.src_dir, "scan_build_patched.err")
+        patched_err_file = os.path.join(self.ci_data.src_dir, "scan_build_patched.err")
         with open(patched_err_file, 'w+') as f:
             f.write(stderr)
         self.log_dbg(f"Saved output for patched build: {patched_err_file}")
@@ -100,23 +104,27 @@ class ScanBuild(Base):
         if results:
             # Add warning...
             self.log_dbg("Found differnece in two build scans: " + results)
-            submit_pw_check(self.pw, self.patch_1, self.name, Verdict.WARNING,
-                            "ScanBuild: " + results, None, self.dry_run)
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.WARNING,
+                            "ScanBuild: " + results,
+                            None, self.ci_data.config['dry_run'])
             self.warning(results)
             # warning() doens't raise the exception.
             raise EndTest
 
-        submit_pw_check(self.pw, self.patch_1, self.name, Verdict.PASS,
-                        "Scan Build PASS", None, self.dry_run)
+        submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                        self.name, Verdict.PASS,
+                        "Scan Build PASS",
+                        None, self.ci_data.config['dry_run'])
         self.success()
 
     def post_run(self):
         self.log_dbg("Post Run...")
 
     def compare_outputs(self, base_err_file, patched_err_file):
-        base_dir = os.path.join(self.src_dir, "scan_build_base")
+        base_dir = os.path.join(self.ci_data.src_dir, "scan_build_base")
         self.parse_err_file(base_err_file, base_dir)
-        patched_dir = os.path.join(self.src_dir, "scan_build_patched")
+        patched_dir = os.path.join(self.ci_data.src_dir, "scan_build_patched")
         self.parse_err_file(patched_err_file, patched_dir)
 
         return self.diff_dirs(base_dir, patched_dir)
@@ -146,7 +154,7 @@ class ScanBuild(Base):
         err_file = ""
 
         cmd = ["diff", "-qr", base_dir, patched_dir]
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.src_dir)
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.ci_data.src_dir)
         if ret == 0:
             self.log_dbg("No changes found - base and patched")
             return None
