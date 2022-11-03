@@ -17,14 +17,16 @@ echo "   BASE-REF:   $GITHUB_BASE_REF"
 echo "   PWD:        $(pwd)"
 
 TASK=$1
-UPSTREAM_REPO=$2
-UPSTREAM_BRANCH=$3
-ORIGIN_BRANCH=$4
-WORKFLOW=$5
-SPACE=$6
+BASE_DIR=$2
+UPSTREAM_REPO=$3
+UPSTREAM_BRANCH=$4
+ORIGIN_BRANCH=$5
+WORKFLOW=$6
+SPACE=$7
 
 echo "Input Parameters:"
 echo "   TASK:             $TASK"
+echo "   BASE_DIR          $BASE_DIR"
 echo "   UPSTREAM_REPO:    $UPSTREAM_REPO"
 echo "   UPSTREAM_BRANCH:  $UPSTREAM_BRANCH"
 echo "   ORIGIN_BRANCH:    $ORIGIN_BRANCH"
@@ -52,6 +54,26 @@ function update_github_token {
     echo "Update repo origin with github token"
     echo "$ git remote set-url origin https://x-access-token:$GITHUB_TOKEN@github.com/$1"
     git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$1"
+}
+
+# Clone ELL
+function clone_ell {
+    # remove if already exist
+    DEST_DIR=$1
+    rm -rf $DEST_DIR
+    git clone --depth=1 https://git.kernel.org/pub/scm/libs/ell/ell $DEST_DIR
+    cd $DEST_DIR
+    git log -1 --format='%H'
+}
+
+# Clone BlueZ
+function clone_bluez {
+    # remove if already exist
+    DEST_DIR=$1
+    rm -rf $DEST_DIR
+    git clone --depth=1 https://git.kernel.org/pub/scm/bluetooth/bluez $DEST_DIR
+    cd $DEST_DIR
+    git log -1 --format='%H'
 }
 
 # Check Github Token
@@ -109,10 +131,37 @@ case $TASK in
             check_github_token
             check_email_token
             check_patchwork_token
-            set_git_safe_dir $GITHUB_WORKSPACE
+
+            # Get PR number from GITHUB_REF (refs/pull/#/merge)
+            PR=${GITHUB_REF#"refs/pull/"}
+            PR=${PR%"/merge"}
+            echo "Target PR: $PR"
+
+            # For CI, assume that source is cloned under src
+            set_git_safe_dir $WORKSPACE/$BASE_DIR/src
+
+            clone_ell $WORKSPACE/$BASE_DIR/ell
+            set_git_safe_dir $WORKSPACE/$BASE_DIR/ell
+
+            if [ $SPACE == "kernel" ]; then
+                clone_bluez $WORKSPACE/$BASE_DIR/bluez
+                set_git_safe_dir $WORKSPACE/$BASE_DIR/bluez
+                /ci.py -c /config.json -z $WORKSPACE/$BASE_DIR/bluez    \
+                                       -e $WORKSPACE/$BASE_DIR/ell      \
+                                       -k $WORKSPACE/$BASE_DIR/src      \
+                                       kernel $GITHUB_REPOSITORY $PR
+            elif [ $SPACE == "user" ]; then
+                /ci.py -c /config.json -z $WORKSPACE/$BASE_DIR/src      \
+                                       -e $WORKSPACE/$BASE_DIR/ell      \
+                                       user $GITHUB_REPOSITORY $PR
+            else
+                echo "Unknown SPACE: $SPACE"
+                exit 1
+            fi
         ;;
     *)
         echo "Unknown TASK: $TASK"
+        eixt 1
         ;;
 esac
 
