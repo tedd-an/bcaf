@@ -119,7 +119,7 @@ case $TASK in
         echo "Task: Clean Up PR"
             # requires GITHUB_TOKEN
             check_github_token
-            /cleanup_pr.py $GITHUB_REPOSITORY
+            /cleanup_pr.py -d $GITHUB_REPOSITORY
         ;;
     patchwork|Patchwork|PATCHWORK)
         echo "Task: Sync Patchwork"
@@ -130,7 +130,7 @@ case $TASK in
             set_git_safe_dir $GITHUB_WORKSPACE
             update_github_token $GITHUB_REPOSITORY
             # calling sync_patchwork.py
-            /sync_patchwork.py -c /config.json -b $WORKFLOW -s $GITHUB_WORKSPACE $SPACE $GITHUB_REPOSITORY
+            /sync_patchwork.py -d -c /config.json -b $WORKFLOW -s $GITHUB_WORKSPACE $SPACE $GITHUB_REPOSITORY
         ;;
     ci|CI|Ci)
         echo "Task: CI"
@@ -155,11 +155,11 @@ case $TASK in
                 /ci.py -c /config.json -z $GITHUB_WORKSPACE/$BASE_DIR/bluez    \
                                        -e $GITHUB_WORKSPACE/$BASE_DIR/ell      \
                                        -k $GITHUB_WORKSPACE/$BASE_DIR/src      \
-                                       kernel $GITHUB_REPOSITORY $PR
+                                       -d kernel $GITHUB_REPOSITORY $PR
             elif [ $SPACE == "user" ]; then
                 /ci.py -c /config.json -z $GITHUB_WORKSPACE/$BASE_DIR/src      \
                                        -e $GITHUB_WORKSPACE/$BASE_DIR/ell      \
-                                       user $GITHUB_REPOSITORY $PR
+                                       -d user $GITHUB_REPOSITORY $PR
             else
                 echo "Unknown SPACE: $SPACE"
                 exit 1
