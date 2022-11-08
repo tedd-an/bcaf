@@ -425,7 +425,7 @@ def main():
 
 
     # Process the series, state 1 = NEW
-    new_series = pw.get_series_by_state(1)
+    new_series = ci_data.pw.get_series_by_state(1)
     if len(new_series) == 0:
         log_info("No new patches/series found. Done. Exit")
         return
