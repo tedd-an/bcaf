@@ -124,7 +124,7 @@ case $TASK in
             set_git_safe_dir $GITHUB_WORKSPACE
             update_github_token $GITHUB_REPOSITORY
             # calling sync_patchwork.py
-            /sync_patchwork -c /config.json -b $WORKFLOW -r $UPSTREAM_REPO -t $SPACE -s $GITHUB_WORKSPACE
+            /sync_patchwork -c /config.json -b $WORKFLOW -r $GITHUB_REPOSITORY -t $SPACE -s $GITHUB_WORKSPACE
         ;;
     ci|CI|Ci)
         echo "Task: CI"
