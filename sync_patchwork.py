@@ -373,10 +373,6 @@ def check_args(args):
         log_error(f"Invalid parameter(config) {args.config}")
         return False
 
-    if not os.path.exists(os.path.abspath(args.repo)):
-        log_error(f"Invalid parameter(repo) {args.repo}")
-        return False
-
     if args.space != 'kernel' and args.space != 'user':
         log_error(f"Invalid parameter(space) {args.space}")
         return False
