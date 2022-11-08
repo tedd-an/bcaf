@@ -434,7 +434,7 @@ def main():
     run_series(ci_data, new_series)
 
     # Cleanup PR
-    cleanup_pullrequest(new_series)
+    cleanup_pullrequest(ci_data, new_series)
 
     log_debug("----- DONE -----")
 
