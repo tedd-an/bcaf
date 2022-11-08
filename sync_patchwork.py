@@ -9,66 +9,8 @@ import tempfile
 
 from github import Github
 
-from libs import init_logger, log_debug, log_error, log_info
-from libs import Patchwork, GithubTool, RepoTool, EmailTool
-
-config = None
-pw = None
-gh = None
-temp_root = None
-src_repo = None
-email = None
-
-def init_config(config_file):
-
-    log_debug(f"Loading config file: {config_file}")
-    with open(config_file, 'r') as f:
-        config = json.load(f)
-
-    return config
-
-def init_patchwork(pw_config):
-    return Patchwork(pw_config['url'], pw_config['project_name'])
-
-def init_github(repo):
-    if 'GITHUB_TOKEN' not in os.environ:
-        log_error("Set GITHUB_TOKEN environment variable")
-        return None
-
-    return GithubTool(repo, os.environ['GITHUB_TOKEN'])
-
-def init_src_repo(src_path):
-    return RepoTool("src_dir", src_path)
-
-def init_email(email_config):
-    token = None
-
-    if 'EMAIL_TOKEN' in os.environ:
-        token = os.environ['EMAIL_TOKEN']
-
-    return EmailTool(token=token, config=email_config)
-
-def pw_series_already_checked(series):
-    """
-    Check if the first patch in the series is already checked
-    """
-    patch_1 = pw.get_patch(series['patches'][0]['id'])
-    if patch_1['check'] == 'pending':
-        return False
-    return True
-
-def get_pw_sid(pr_title):
-    """
-    Parse PR title prefix and get PatchWork Series ID
-    PR Title Prefix = "[PW_S_ID:<series_id>] XXXXX"
-    """
-    try:
-        sid = re.search(r'^\[PW_SID:([0-9]+)\]', pr_title).group(1)
-    except AttributeError:
-        log_error(f"Unable to find the series_id from title {pr_title}")
-        return 0
-    return int(sid)
-
+from libs import init_logger, log_debug, log_error, log_info, pr_get_sid
+from libs import Patchwork, GithubTool, RepoTool, EmailTool, Context
 
 def patch_get_new_file_list(patch):
     """
@@ -134,7 +76,7 @@ def patch_get_file_list(patch):
 
     return file_list
 
-def series_get_file_list(series, ignore_new_file=False):
+def series_get_file_list(ci_data, series, ignore_new_file=False):
     """
     Get the list of files from the patches in the series.
     """
@@ -143,7 +85,7 @@ def series_get_file_list(series, ignore_new_file=False):
     new_file_list = []
 
     for patch in series['patches']:
-        full_patch = pw.get_patch(patch['id'])
+        full_patch = ci_data.pw.get_patch(patch['id'])
         file_list += patch_get_file_list(full_patch['diff'])
         if ignore_new_file:
             new_file_list += patch_get_new_file_list(full_patch['diff'])
@@ -161,7 +103,7 @@ def series_get_file_list(series, ignore_new_file=False):
 
     return new_list
 
-def filter_repo_space(space_details, series, src_dir):
+def filter_repo_space(ci_data, space_details, series, src_dir):
     """
     Check if the series belong to this repository
 
@@ -191,7 +133,7 @@ def filter_repo_space(space_details, series, src_dir):
             return True
 
     # Get file list from the patches in the series
-    file_list = series_get_file_list(series, ignore_new_file=True)
+    file_list = series_get_file_list(ci_data, series, ignore_new_file=True)
     if len(file_list) == 0:
         # Something is not right.
         log_error("ERROR: No files found in the series/patch")
@@ -200,7 +142,7 @@ def filter_repo_space(space_details, series, src_dir):
 
     # File exist in source tree?
     for filename in file_list:
-        file_path = os.path.join(config['src_dir'], filename)
+        file_path = os.path.join(src_dir, filename)
         if not os.path.exists(file_path):
             log_error(f"File not found: {filename}")
             return False
@@ -217,7 +159,7 @@ Thank you for submitting the patches to the linux bluetooth mailing list.
 While preparing the CI tests, the patches you submitted couldn't be applied to the current HEAD of the repository.
 
 ----- Output -----
-{}
+{content}
 
 Please resolve the issue and submit the patches again.
 
@@ -228,65 +170,76 @@ Linux Bluetooth
 
 '''
 
-def send_email(series, content):
+def is_maintainers_only(email_config):
+    if 'only-maintainers' in email_config and email_config['only-maintainers']:
+        return True
+    return False
+
+def get_receivers(email_config, submitter):
+    log_debug("Get the list of email receivers")
 
     receivers = []
-    headers = {}
-
-    if not config['email']['enable']:
-        log_info("Email is DISABLED. Skip sending email")
-        return
-
-    if config['email']['only-maintainers']:
-        receivers.extend(config['email']['maintainers'])
+    if is_maintainers_only(email_config):
+        # Send only to the maintainers
+        receivers.extend(email_config['maintainers'])
     else:
-        receivers.append(config['email']['default-to'])
-        receivers.append(series['submitter']['email'])
-    log_debug(f"Email Receivers: {receivers}")
+        # Send to default-to and submitter
+        receivers.append(email_config['default-to'])
+        receivers.append(submitter)
 
-    email.set_receivers(", ".join(receivers))
+    return receivers
 
-    # Get the email msgid from the first patch
+def send_email(ci_data, series, content):
+
+    headers = {}
+    email_config = ci_data.config['email']
+
+    body = EMAIL_MESSAGE.format(content=content)
+
     patch_1 = series['patches'][0]
     headers['In-Reply-To'] = patch_1['msgid']
     headers['References'] = patch_1['msgid']
-    headers['Reply-To'] = config['email']['default-to']
 
-    # Compose email
-    title = f"RE: {series['name']}"
-    body = EMAIL_MESSAGE.format(content)
+    if not is_maintainers_only(email_config):
+        headers['Reply-To'] = email_config['default-to']
 
-    email.compose(title, body, headers)
-    email.send()
+    receivers = get_receivers(email_config,
+                              series['submitter']['email'])
+    ci_data.email.set_receivers(receivers)
 
-def create_pullrequest(series, base, head):
-    title = f"[PW_SID:{series['id']}] {series['name']}"
+    ci_data.email.compose(f"RE: {series['name']}", body, headers)
 
-    # Use the commit of the patch for pr body
-    patch_1 = pw.get_patch(series['patches'][0]['id'])
-    return gh.create_pr(title, patch_1['content'], base, head)
+    if ci_data.config['dry_run']:
+        log_info("Dry-Run: Skip sending email")
+        return
 
-def series_check_patches(series):
+    log_info("Sending Email...")
+    ci_data.email.send()
+
+def series_check_patches(ci_data, series):
 
     # Save series/patches to the local directory
-    series_dir = os.path.join(temp_root, f"{series['id']}")
+    series_dir = os.path.join(ci_data.config['temp_root'], f"{series['id']}")
     if not os.path.exists(series_dir):
         os.makedirs(series_dir)
     log_debug(f"Series PATH: {series_dir}")
 
     # Reset source branch to base branch
-    if src_repo.git_checkout(config['branch']):
+    if ci_data.src_repo.git_checkout(ci_data.config['branch']):
         # No need to continue
-        log_error(f"ERROR: Failed: git checkout {config['branch']}")
+        log_error(f"ERROR: Failed: git checkout {ci_data.config['branch']}")
         return False
 
     # Create branch for series
-    if src_repo.git_checkout(f"{series['id']}", create_branch=True):
+    if ci_data.src_repo.git_checkout(f"{series['id']}", create_branch=True):
         log_error(f"ERROR: Failed: git checkout -b {series['id']}")
         return False
 
-    already_checked = pw_series_already_checked(series)
-    if already_checked:
+    # Already checked?
+    already_checked = False
+    patch_1 = ci_data.pw.get_patch(series['patches'][0]['id'])
+    if patch_1['check'] != 'pending':
+        already_checked = True
         log_info("This series is already checked")
 
     verdict = True
@@ -296,67 +249,73 @@ def series_check_patches(series):
     log_debug("Process the patches in this series")
     for patch in series['patches']:
         log_debug(f"Patch: {patch['id']}: {patch['name']}")
-        patch_mbox = pw.get_patch_mbox(patch['id'])
+        patch_mbox = ci_data.pw.get_patch_mbox(patch['id'])
         patch_path = os.path.join(series_dir, f"{patch['id']}.patch")
         with open(patch_path, 'w') as f:
             f.write(patch_mbox)
         log_debug(f"Patch mbox saved to file: {patch_path}")
 
         # Apply patch
-        if src_repo.git_am(patch_path):
+        if ci_data.src_repo.git_am(patch_path):
             # git am failed. Update patchwork/checks and abort
             verdict = False
 
             # Update the contents for email body
-            content = src_repo.stderr
+            content = ci_data.src_repo.stderr
 
-            src_repo.git_am(abort=True)
+            ci_data.src_repo.git_am(abort=True)
 
-            if config['dry_run'] or already_checked:
+            if ci_data.config['dry_run'] or already_checked:
                 log_info("Skip submitting the result to PW")
                 break
 
-            pw.post_check(patch['id'], "pre-ci_am", 3, content)
+            ci_data.pw.post_check(patch['id'], "pre-ci_am", 3, content)
             break
 
         # git am success
-        if config['dry_run'] or already_checked:
+        if ci_data.config['dry_run'] or already_checked:
             log_info("Skip submitting the result to PW: Success")
         else:
-            pw.post_check(patch['id'], "pre-ci_am", 1, "Success")
+            ci_data.pw.post_check(patch['id'], "pre-ci_am", 1, "Success")
 
     if not verdict:
         log_info("PRE-CI AM failed. Notify the submitter")
-        if config['dry_run'] or already_checked:
+        if ci_data.config['dry_run'] or already_checked:
             log_info("Skip sending email")
             return False
 
-        send_email(series, content)
+        send_email(ci_data, series, content)
 
         return False
 
-    if config['dry_run']:
+    if ci_data.config['dry_run']:
         log_info("Dry-Run: Skip creating PR")
         return True
 
     # Create Pull Request
-    if src_repo.git_push(f"{series['id']}"):
+    if ci_data.src_repo.git_push(f"{series['id']}"):
         log_error("Failed to push the source to Github")
         return False
 
-    if not create_pullrequest(series, config['branch'], f"{series['id']}"):
-        log_error("Failed to create pull request")
-        return False
+    title = f"[PW_SID:{series['id']}] {series['name']}"
 
-    return True
+    # Use the commit of the patch for pr body
+    patch_1 = ci_data.pw.get_patch(series['patches'][0]['id'])
+    if ci_data.gh.create_pr(title, patch_1['content'], ci_data.config['branch'],
+                            f"{series['id']}"):
+        return True
 
-def process_series(new_series):
+    return False
+
+def run_series(ci_data, new_series):
 
     log_debug("##### Processing Series #####")
 
+    space_details = ci_data.config['space_details'][ci_data.config['space']]
+
     # Process the series
     for series in new_series:
-        log_info(f"Series: {series['id']}")
+        log_info(f"Process Series: {series['id']}")
 
         # If the series subject doesn't have the key-str, ignore it.
         # Sometimes, the name have null value. If that's the case, use the
@@ -367,52 +326,46 @@ def process_series(new_series):
             log_debug(f"updated series name: {series['name']}")
 
         # Filter the series by include/exclude string
-        if not filter_repo_space(config['space_details'][config['space_type']],
-                                 series, config['src_dir']):
-            log_info(f"Not for this repo: {config['space_type']}")
+        if not filter_repo_space(ci_data, space_details, series,
+                                 ci_data.src_dir):
+            log_info(f"Series is NOT for this repo")
             continue
 
         # Check if PR already exist
-        if gh.pr_exist_title(f"PW_SID:{series['id']}"):
+        if ci_data.gh.pr_exist_title(f"PW_SID:{series['id']}"):
             log_info("PR exists already")
             continue
 
         # This series is ready to create PR
-        series_check_patches(series)
+        series_check_patches(ci_data, series)
 
-    log_debug("##### Completed processing Series #####")
+    log_debug("##### processing Series Done #####")
 
-def search_sid_in_series(pw_sid, new_series):
-
-    for series in new_series:
-        if series['id'] == pw_sid:
-            return True
-    return False
-
-def cleanup_pullrequest(new_series):
+def cleanup_pullrequest(ci_data, new_series):
 
     log_debug("##### Clean Up Pull Request #####")
 
-    prs = gh.get_prs(force=True)
+    prs = ci_data.gh.get_prs(force=True)
     log_debug(f"Current PR: {prs}")
     for pr in prs:
         log_debug(f"PR: {pr}")
-        pw_sid = get_pw_sid(pr.title)
+        pw_sid = pr_get_sid(pr.title)
         log_debug(f"PW_SID: {pw_sid}")
 
-        if search_sid_in_series(pw_sid, new_series):
-            log_debug("PW_SID found from PR list. Keep PR")
+        for series in new_series:
+            if series['id'] == pw_sid:
+                log_debug(f"PW_SID:{pw_sid} found in PR list. Keep PR")
+                continue
+
+        log_debug(f"PW_SID:{pw_sid} not found in PR list. Close PR")
+
+        if ci_data.config['dry_run']:
+            log_debug("Dry-Run is set. Skip closing Github Pull Request")
             continue
 
-        log_debug("PW_SID not found from PR list. Close PR")
+        ci_data.gh.close_pr(pr.number)
 
-        if config['dry_run']:
-            log_debug("Skip closing Github Pull Request")
-            continue
-
-        gh.close_pr(pr.number)
-
-    log_debug("##### Completed Cleaning Up Pull Request #####")
+    log_debug("##### Clean Up Pull Request Done #####")
 
 def check_args(args):
 
@@ -424,8 +377,8 @@ def check_args(args):
         log_error(f"Invalid parameter(repo) {args.repo}")
         return False
 
-    if args.space_type != 'kernel' and args.space_type != 'user':
-        log_error(f"Invalid parameter(space_type) {args.space_type}")
+    if args.space != 'kernel' and args.space != 'user':
+        log_error(f"Invalid parameter(space) {args.space}")
         return False
 
     if not os.path.exists(os.path.abspath(args.src_dir)):
@@ -439,49 +392,41 @@ def parse_args():
                             "Manage patch series in Patchwork and create PR")
     ap.add_argument('-c', '--config', default='./config.json',
                     help='Configuration file to use')
-    ap.add_argument("-r", "--repo", required=True,
-                    help="Name of base repo where the PR is pushed. "
-                         "Use <OWNER>/<REPO> format. i.e. bluez/bluez")
     ap.add_argument("-b", "--branch", default="workflow",
                     help="Name of branch in base_repo where the PR is pushed. "
                          "Use <BRANCH> format. i.e. workflow")
-    ap.add_argument("-t", "--space-type", default="kernel",
-                    help="Specify the string to distinguish the repo type: "
-                         "kernel or user")
     ap.add_argument('-s', '--src-dir', required=True,
                     help='Source directory')
     ap.add_argument('-d', '--dry-run', action='store_true', default=False,
                     help='Run it without uploading the result')
+
+    # Positional paramter
+    ap.add_argument('space', choices=['user', 'kernel'],
+                    help="user or kernel space")
+    ap.add_argument("repo",
+                    help="Name of Github repository. i.e. bluez/bluez")
     return ap.parse_args()
 
 def main():
-    global config, pw, gh, temp_root, src_repo, email
 
-    init_logger("Sync_Patchwork", verbose=True)
+    init_logger("SyncPatchwork", verbose=True)
 
     args = parse_args()
-    if check_args(args):
+    if not check_args(args):
         sys.exit(1)
-
-    config = init_config(os.path.abspath(args.config))
-    if  config == None:
-        sys.exit(1)
-    config['space_type'] = args.space_type
-    config['branch'] = args.branch
-    config['dry_run'] = args.dry_run
-    config['src_dir'] = args.src_dir
-
-    pw = init_patchwork(config['patchwork'])
-    gh = init_github(args.repo)
-    if not gh:
-        log_error("Failed to init github object")
-        sys.exit(1)
-    src_repo = init_src_repo(args.src_dir)
-    email = init_email(config['email'])
 
     # Set temp workspace
     temp_root = tempfile.TemporaryDirectory().name
     log_info(f"Temp Root Dir: {temp_root}")
+
+    ci_data = Context(config_file=os.path.abspath(args.config),
+                      github_repo=args.repo,
+                      src_dir=args.src_dir,
+                      branch=args.branch,
+                      space=args.space,
+                      dry_run=args.dry_run,
+                      temp_root=temp_root)
+
 
     # Process the series, state 1 = NEW
     new_series = pw.get_series_by_state(1)
@@ -490,7 +435,7 @@ def main():
         return
 
     # Process Series
-    process_series(new_series)
+    run_series(ci_data, new_series)
 
     # Cleanup PR
     cleanup_pullrequest(new_series)
