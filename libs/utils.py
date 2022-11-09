@@ -17,7 +17,7 @@ def init_logger(name, verbose=False):
         logger.setLevel(logging.DEBUG)
 
     ch = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s:%(levelname)-8s:%(message)s')
+    formatter = logging.Formatter('%(asctime)s:%(levelname)-8s:%(funcName)20s():%(message)s')
     ch.setFormatter(formatter)
 
     logger.addHandler(ch)
@@ -88,7 +88,9 @@ def cmd_run(cmd: List[str], shell: bool = False, add_env: Dict[str, str] = None,
     log_info(f'RET: {proc.returncode}')
     # No need to print STDOUT here again. It is already printed above
     # log_debug(f'STDOUT:{stdout}')
-    log_debug(f'STDERR:{stderr}')
+    # Print STDOUT only if ret != 0
+    if proc.returncode:
+        log_debug(f'STDERR:{stderr}')
 
     if proc.returncode != 0:
         if stderr and stderr[:-1] == "\n":
