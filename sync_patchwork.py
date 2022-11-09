@@ -315,7 +315,7 @@ def run_series(ci_data, new_series):
 
     # Process the series
     for series in new_series:
-        log_info(f"Process Series: {series['id']}")
+        log_info(f"\n### Process Series: {series['id']} ###")
 
         # If the series subject doesn't have the key-str, ignore it.
         # Sometimes, the name have null value. If that's the case, use the
