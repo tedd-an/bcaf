@@ -21,7 +21,7 @@ class GitLint(Base):
         if gitlint_config:
             self.gitlint_config = gitlint_config
         else:
-            self.gitlint_config = './.gitlint'
+            self.gitlint_config = '/gitlint'
 
         super().__init__()
 
