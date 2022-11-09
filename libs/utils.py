@@ -17,7 +17,7 @@ def init_logger(name, verbose=False):
         logger.setLevel(logging.DEBUG)
 
     ch = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s:%(levelname)-8s:%(funcName)20s():%(message)s')
+    formatter = logging.Formatter('%(asctime)s:%(levelname)-8s:%(message)s')
     ch.setFormatter(formatter)
 
     logger.addHandler(ch)
