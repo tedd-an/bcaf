@@ -22,7 +22,7 @@ class CheckPatch(Base):
         if checkpatch_pl:
             self.checkpatch_pl = checkpatch_pl
         else:
-            self.checkpatch_pl = '/home/han1/work/dev/bluetooth-next/scripts/checkpatch.pl'
+            self.checkpatch_pl = '/usr/bin/checkpatch.pl'
 
         super().__init__()
 
