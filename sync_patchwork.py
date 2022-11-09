@@ -288,8 +288,8 @@ def series_check_patches(ci_data, series):
 
         return False
 
-    if ci_data.config['dry_run']:
-        log_info("Dry-Run: Skip creating PR")
+    if ci_data.config['disable_pr']:
+        log_info("Disable PR: Skip creating PR")
         return True
 
     # Create Pull Request
@@ -395,6 +395,8 @@ def parse_args():
                     help='Source directory')
     ap.add_argument('-d', '--dry-run', action='store_true', default=False,
                     help='Run it without uploading the result')
+    ap.add_argument('-p', '--disable-pr', action='store_true', default=False,
+                    help='Disable creating pull request')
 
     # Positional paramter
     ap.add_argument('space', choices=['user', 'kernel'],
@@ -421,6 +423,7 @@ def main():
                       branch=args.branch,
                       space=args.space,
                       dry_run=args.dry_run,
+                      disable_pr=args.disable_pr,
                       temp_root=temp_root)
 
 
