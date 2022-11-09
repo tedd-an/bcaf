@@ -138,21 +138,21 @@ case $TASK in
             echo "Target PR: $PR"
 
             # For CI, assume that source is cloned under src
-            set_git_safe_dir $WORKSPACE/$BASE_DIR/src
+            set_git_safe_dir $GITHUB_WORKSPACE/$BASE_DIR/src
 
-            clone_ell $WORKSPACE/$BASE_DIR/ell
-            set_git_safe_dir $WORKSPACE/$BASE_DIR/ell
+            clone_ell $GITHUB_WORKSPACE/$BASE_DIR/ell
+            set_git_safe_dir $GITHUB_WORKSPACE/$BASE_DIR/ell
 
             if [ $SPACE == "kernel" ]; then
-                clone_bluez $WORKSPACE/$BASE_DIR/bluez
-                set_git_safe_dir $WORKSPACE/$BASE_DIR/bluez
-                /ci.py -c /config.json -z $WORKSPACE/$BASE_DIR/bluez    \
-                                       -e $WORKSPACE/$BASE_DIR/ell      \
-                                       -k $WORKSPACE/$BASE_DIR/src      \
+                clone_bluez $GITHUB_WORKSPACE/$BASE_DIR/bluez
+                set_git_safe_dir $GITHUB_WORKSPACE/$BASE_DIR/bluez
+                /ci.py -c /config.json -z $GITHUB_WORKSPACE/$BASE_DIR/bluez    \
+                                       -e $GITHUB_WORKSPACE/$BASE_DIR/ell      \
+                                       -k $GITHUB_WORKSPACE/$BASE_DIR/src      \
                                        kernel $GITHUB_REPOSITORY $PR
             elif [ $SPACE == "user" ]; then
-                /ci.py -c /config.json -z $WORKSPACE/$BASE_DIR/src      \
-                                       -e $WORKSPACE/$BASE_DIR/ell      \
+                /ci.py -c /config.json -z $GITHUB_WORKSPACE/$BASE_DIR/src      \
+                                       -e $GITHUB_WORKSPACE/$BASE_DIR/ell      \
                                        user $GITHUB_REPOSITORY $PR
             else
                 echo "Unknown SPACE: $SPACE"
