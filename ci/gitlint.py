@@ -46,13 +46,12 @@ class GitLint(Base):
                                 None, self.ci_data.config["dry_run"])
                 continue
 
-            msg = f"{patch['name']}\n{stderr}"
             submit_pw_check(self.ci_data.pw, patch,
                             self.name, Verdict.FAIL,
-                            msg,
+                            stderr,
                             None, self.ci_data.config["dry_run"])
             self.log_dbg("Test result FAIL")
-            self.add_failure(msg)
+            self.add_failure(f"{patch['name']}\n{stderr}")
 
         if self.verdict == Verdict.FAIL:
             self.log_info(f"Test Verdict: {self.verdict.name}")
