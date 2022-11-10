@@ -32,6 +32,9 @@ inputs:
   patchwork_token:
     description: Patchwork token
     default: ''
+  patchwork_user:
+    description: Patchwork username
+    default: ''
 runs:
   using: 'docker'
   image: 'Dockerfile'
@@ -39,6 +42,7 @@ runs:
     GITHUB_TOKEN: ${{ inputs.github_token }}
     EMAIL_TOKEN: ${{ inputs.email_token }}
     PATCHWORK_TOKEN: ${{ inputs.patchwork_token }}
+    PATCHWORK_USER: ${{ inputs.patchwork_user }}
   args:
     - ${{ inputs.task }}
     - ${{ inputs.base_folder }}
