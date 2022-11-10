@@ -32,7 +32,7 @@ class Patchwork():
         self._user = user
 
     def _request(self, url):
-        libs.log_debug(f"Request URL: {url}")
+        libs.log_debug(f"PW GET URL: {url}")
         resp = self._session.get(url)
         if resp.status_code != 200:
             raise requests.HTTPError(f"GET {resp.status_code}")
@@ -60,6 +60,7 @@ class Patchwork():
 
     def _post(self, req, headers, data):
         url = f'{self._server}{self._api}/{req}'
+        libs.log_debug(f"PW POST URL: {url}")
         return self._session.post(url, headers=headers, data=data)
 
     def get(self, type, identifier):
@@ -105,8 +106,10 @@ class Patchwork():
             'description': desc
         }
 
-        resp = self._post(f"patches/{patch['id']}/checks/", headers=headers, data=data)
-        if resp.status_code != 201:
+        resp = self._post(f"patches/{patch['id']}/checks/", data=data,
+                          headers=headers)
+        if resp.status_code != 201 and resp.status_code != 200:
+            libs.log_error(f"PW POST failed: {resp.status_code}")
             raise PostException(f"POST {resp.status_code}")
 
     def get_series_mbox(self, id):
