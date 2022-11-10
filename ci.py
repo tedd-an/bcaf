@@ -87,7 +87,7 @@ def github_pr_post_result(ci_data, test):
     comment = f"**{test.name}**\n"
     comment += f"Desc: {test.desc}\n"
     comment += f"Duration: {test.elapsed():.2f} seconds\n"
-    comment += f"**Result: {test.status}**\n"
+    comment += f"**Result: {test.verdict.name}**\n"
 
     if test.output:
         comment += f"Output:\n```\n{test.output}\n```"
