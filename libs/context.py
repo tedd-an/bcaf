@@ -32,6 +32,15 @@ class Context():
             log_error("Failed to initialize Patchwork class")
             raise ContextError
 
+        # If token and username is available, set it here
+        if 'PATCHWORK_TOKEN' in os.environ and os.environ['PATCHWORK_TOKEN'] != "":
+            log_debug("Found Patchwork Token in environment variable")
+            self.pw.set_token(os.environ['PATCHWORK_TOKEN'])
+
+        if 'PATCHWORK_USER' in os.environ and os.environ['PATCHWORK_USER'] != "":
+            log_debug("Found Patchwork User in environment variable")
+            self.pw.set_user(int(os.environ['PATCHWORK_USER']))
+
         # Init github
         log_info(f"Initialize Github: {github_repo}")
         if 'GITHUB_TOKEN' not in os.environ:
