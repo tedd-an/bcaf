@@ -195,6 +195,7 @@ class ScanBuild(Base):
         for line in lines:
             # Found key string
             if line.find(' generated.') >= 0:
+                self.log_dbg(">>>>> DBG >>>>>")
                 err_lines += line
 
                 line1 = err_lines.splitlines()[0]
@@ -202,13 +203,17 @@ class ScanBuild(Base):
                 # Some output starts with "In file included from "
                 if line1.find("In file included", 0, 20) >= 0:
                     line1 = line1.replace("In file included from ", '')
+                self.log_dbg(f"DBG: line1: {line1}")
 
                 file_path = line1.split(':')[0]
+                self.log_dbg(f"DBG: file_path: {file_path}")
 
                 target_path = os.path.join(out_dir,
                                            os.path.dirname(file_path))
+                self.log_dbg(f"DBG: target_path: {target_path}")
                 target_file = os.path.join(target_path,
                                            os.path.basename(file_path) + ".err")
+                self.log_dbg(f"DBG: target_file: {target_file}")
 
                 if not os.path.exists(target_path):
                     os.makedirs(target_path, exist_ok=True)
@@ -221,6 +226,7 @@ class ScanBuild(Base):
 
                 # reset and continue
                 err_lines = ""
+                self.log_dbg("err_lines cleaned")
                 continue
 
             err_lines += line
