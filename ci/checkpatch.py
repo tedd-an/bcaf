@@ -41,31 +41,35 @@ class CheckPatch(Base):
             if ret == 0:
                 # CheckPatch PASS
                 self.log_dbg("Test result PASSED")
-                submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                submit_pw_check(self.ci_data.pw, patch,
                                 self.name, Verdict.PASS,
                                 "CheckPatch PASS",
                                 None, self.ci_data.config['dry_run'])
                 continue
 
-            msg = f"{patch['name']}\n{stderr}"
-            if stderr.find("ERROR:") != -1:
+            # checkpatch script sends STDERR to STDOUT. so combint stdout and
+            # stderr together before processing the output
+            outstr = stdout + "\n" + stderr
+            msg = f"{patch['name']}\n{outstr}"
+            if outstr.find("ERROR:") != -1:
                 self.log_dbg("Test result FAIL")
-                submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                submit_pw_check(self.ci_data.pw, patch,
                                 self.name, Verdict.FAIL,
-                                msg,
+                                outstr,
                                 None, self.ci_data.config['dry_run'])
                 self.add_failure(msg)
                 continue
 
-            if stderr.find("WARNING:") != -1:
+            if outstr.find("WARNING:") != -1:
                 self.log_dbg("Test result WARNING")
-                submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                submit_pw_check(self.ci_data.pw, patch,
                                 self.name, Verdict.WARNING,
-                                msg,
+                                outstr,
                                 None, self.ci_data.config['dry_run'])
                 self.add_failure(msg)
                 continue
 
+        # Overall result
         if self.verdict == Verdict.FAIL:
             self.log_info(f"Test Verdict: {self.verdict.name}")
             raise EndTest
