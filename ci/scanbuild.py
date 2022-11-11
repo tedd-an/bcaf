@@ -193,6 +193,11 @@ class ScanBuild(Base):
         err_lines = ""
 
         for line in lines:
+
+            # ignore if the line is empty line
+            if line.strip() == "":
+                continue
+
             # Found key string
             if line.find(' generated.') >= 0:
                 self.log_dbg(">>>>> DBG >>>>>")
