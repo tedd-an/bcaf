@@ -23,28 +23,9 @@ class ScanBuild(Base):
 
         self.log_dbg("Initialization completed")
 
-    def run(self):
-
-        self.log_dbg("Run")
-        self.start_timer()
-
-        # Create the temp branch (HEAD) to come back later
-        if self.ci_data.src_repo.git_checkout("patched", create_branch=True):
-            self.log_err("Failed to create branch")
-            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
-                            self.name, Verdict.FAIL,
-                            "Setup failed",
-                            None, self.ci_data.config['dry_run'])
-            self.add_failure_end_test("Setup failed")
-
-        # Checkout the source to the base where it has no patches applied
-        if self.ci_data.src_repo.git_checkout("origin/workflow"):
-            self.log_err("Failed to checkout to base branch")
-            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
-                            self.name, Verdict.FAIL,
-                            "Setup failed",
-                            None, self.ci_data.config['dry_run'])
-            self.add_failure_end_test("Setup failed")
+    def scan_build(self, error_filename):
+        # Build and save the error log
+        # After saving the error log, it will cleans the build
 
         # Configure the build for base
         cmd = ["./bootstrap-configure", "--disable-asan", "--disable-lsan",
@@ -70,10 +51,49 @@ class ScanBuild(Base):
             self.add_failure_end_test(stderr)
 
         # Save the stderr for later use
-        base_err_file = os.path.join(self.ci_data.src_dir, "scan_build_base.err")
-        with open(base_err_file, 'w+') as f:
+        err_file = os.path.join(self.ci_data.src_dir, error_filename)
+        with open(err_file, 'w+') as f:
             f.write(stderr)
-        self.log_dbg(f"Saved output for base build: {base_err_file}")
+        self.log_dbg(f"Saved output for base build: {err_file}")
+
+        # Clean the source
+        cmd = ["make", "maintainer-clean"]
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.ci_data.src_dir)
+        if ret:
+            self.log_err("Build clean failed")
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            "Scan Build FAIL",
+                            None, self.ci_data.config['dry_run'])
+            self.add_failure_end_test(stderr)
+
+        return err_file
+
+    def run(self):
+
+        self.log_dbg("Run")
+        self.start_timer()
+
+        # Create the temp branch (HEAD) to come back later
+        if self.ci_data.src_repo.git_checkout("patched", create_branch=True):
+            self.log_err("Failed to create branch")
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            "Setup failed",
+                            None, self.ci_data.config['dry_run'])
+            self.add_failure_end_test("Setup failed")
+
+        # Checkout the source to the base where it has no patches applied
+        if self.ci_data.src_repo.git_checkout("origin/workflow"):
+            self.log_err("Failed to checkout to base branch")
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
+                            self.name, Verdict.FAIL,
+                            "Setup failed",
+                            None, self.ci_data.config['dry_run'])
+            self.add_failure_end_test("Setup failed")
+
+        # Run scan build with base, and save the error log
+        base_err_file = self.scan_build("scan_build_base.err")
 
         # Now checked out the patched branch
         if self.ci_data.src_repo.git_checkout("patched"):
@@ -84,22 +104,10 @@ class ScanBuild(Base):
                             None, self.ci_data.config['dry_run'])
             self.add_failure_end_test("Setup failed")
 
-        # Run scan build again with patched branch
-        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.ci_data.src_dir)
-        if ret:
-            self.log_err("Scan Build failed")
-            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
-                            self.name, Verdict.FAIL,
-                            "Scan Build FAIL",
-                            None, self.ci_data.config['dry_run'])
-            self.add_failure_end_test(stderr)
+        # Run scan build with patched, and save the error log
+        patched_err_file = self.scan_build("scan_build_patched.err")
 
-        # Save the stderr
-        patched_err_file = os.path.join(self.ci_data.src_dir, "scan_build_patched.err")
-        with open(patched_err_file, 'w+') as f:
-            f.write(stderr)
-        self.log_dbg(f"Saved output for patched build: {patched_err_file}")
-
+        # Compare two error files
         results = self.compare_outputs(base_err_file, patched_err_file)
         if results:
             # Add warning...
@@ -200,7 +208,6 @@ class ScanBuild(Base):
 
             # Found key string
             if line.find(' generated.') >= 0:
-                self.log_dbg(">>>>> DBG >>>>>")
                 err_lines += line
 
                 line1 = err_lines.splitlines()[0]
@@ -208,17 +215,13 @@ class ScanBuild(Base):
                 # Some output starts with "In file included from "
                 if line1.find("In file included", 0, 20) >= 0:
                     line1 = line1.replace("In file included from ", '')
-                self.log_dbg(f"DBG: line1: {line1}")
 
                 file_path = line1.split(':')[0]
-                self.log_dbg(f"DBG: file_path: {file_path}")
 
                 target_path = os.path.join(out_dir,
                                            os.path.dirname(file_path))
-                self.log_dbg(f"DBG: target_path: {target_path}")
                 target_file = os.path.join(target_path,
                                            os.path.basename(file_path) + ".err")
-                self.log_dbg(f"DBG: target_file: {target_file}")
 
                 if not os.path.exists(target_path):
                     os.makedirs(target_path, exist_ok=True)
@@ -231,7 +234,6 @@ class ScanBuild(Base):
 
                 # reset and continue
                 err_lines = ""
-                self.log_dbg("err_lines cleaned")
                 continue
 
             err_lines += line
