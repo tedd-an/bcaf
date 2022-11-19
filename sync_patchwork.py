@@ -301,6 +301,7 @@ def series_check_patches(ci_data, series):
 
     # Use the commit of the patch for pr body
     patch_1 = ci_data.pw.get_patch(series['patches'][0]['id'])
+    log_info(f"Creating PR: {title}")
     if ci_data.gh.create_pr(title, patch_1['content'], ci_data.config['branch'],
                             f"{series['id']}"):
         return True
@@ -341,6 +342,18 @@ def run_series(ci_data, new_series):
 
     log_debug("##### processing Series Done #####")
 
+def sid_in_series_list(sid, series_list):
+
+    log_debug(f"Search PW SID({sid} in the series list")
+    for series in series_list:
+        if sid == series['id']:
+            log_debug("Found matching PW_SID in series list")
+            return series
+
+    log_debug("No found matching PW_SID in series list")
+
+    return None
+
 def cleanup_pullrequest(ci_data, new_series):
 
     log_debug("##### Clean Up Pull Request #####")
@@ -352,10 +365,9 @@ def cleanup_pullrequest(ci_data, new_series):
         pw_sid = pr_get_sid(pr.title)
         log_debug(f"PW_SID: {pw_sid}")
 
-        for series in new_series:
-            if series['id'] == pw_sid:
-                log_debug(f"PW_SID:{pw_sid} found in PR list. Keep PR")
-                continue
+        if sid_in_series_list(pw_sid, new_series):
+            log_debug(f"PW_SID:{pw_sid} found in PR list. Keep PR")
+            continue
 
         log_debug(f"PW_SID:{pw_sid} not found in PR list. Close PR")
 
