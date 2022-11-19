@@ -346,7 +346,7 @@ def sid_in_series_list(sid, series_list):
 
     log_debug(f"Search PW SID({sid} in the series list")
     for series in series_list:
-        if sid == series['id']:
+        if int(sid) == series['id']:
             log_debug("Found matching PW_SID in series list")
             return series
 
