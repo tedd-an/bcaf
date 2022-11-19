@@ -269,14 +269,14 @@ def series_check_patches(ci_data, series):
                 log_info("Skip submitting the result to PW")
                 break
 
-            ci_data.pw.post_check(patch['id'], "pre-ci_am", 3, content)
+            ci_data.pw.post_check(patch, "pre-ci_am", 3, content)
             break
 
         # git am success
         if ci_data.config['dry_run'] or already_checked:
             log_info("Skip submitting the result to PW: Success")
         else:
-            ci_data.pw.post_check(patch['id'], "pre-ci_am", 1, "Success")
+            ci_data.pw.post_check(patch, "pre-ci_am", 1, "Success")
 
     if not verdict:
         log_info("PRE-CI AM failed. Notify the submitter")
