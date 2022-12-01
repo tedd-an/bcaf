@@ -363,6 +363,10 @@ def cleanup_pullrequest(ci_data, new_series):
     for pr in prs:
         log_debug(f"PR: {pr}")
         pw_sid = pr_get_sid(pr.title)
+        if not pw_sid:
+            log_debug(f"Not a valid PR title: {pr.title}. Skip PR")
+            continue
+
         log_debug(f"PW_SID: {pw_sid}")
 
         if sid_in_series_list(pw_sid, new_series):

@@ -341,7 +341,15 @@ def main():
         sys.exit(1)
 
     # Get the patchwork series data and save in CI data
-    ci_data.update_series(ci_data.pw.get_series(pr_get_sid(pr.title)))
+    sid = pr_get_sid(pr.title)
+
+    # If PR is not created for Patchwork (no key string), ignore this PR and
+    # stop running the CI
+    if not sid:
+        log_error("Not a valid PR. No need to run")
+        sys.exit(1)
+
+    ci_data.update_series(ci_data.pw.get_series(sid))
 
     num_fails = run_ci(ci_data)
 
