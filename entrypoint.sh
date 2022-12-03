@@ -115,6 +115,12 @@ case $TASK in
             # param: workflow
             /sync_repo.sh $UPSTREAM_REPO $UPSTREAM_BRANCH $ORIGIN_BRANCH $WORKFLOW
         ;;
+    cleanup|Cleanup|CLENAUP)
+        echo "Task: Clean Up PR"
+            # requires GITHUB_TOKEN
+            check_github_token
+            /cleanup_pr.py $GITHUB_REPOSITORY
+        ;;
     patchwork|Patchwork|PATCHWORK)
         echo "Task: Sync Patchwork"
             # required tokens
@@ -124,7 +130,6 @@ case $TASK in
             set_git_safe_dir $GITHUB_WORKSPACE
             update_github_token $GITHUB_REPOSITORY
             # calling sync_patchwork.py
-            /cleanup_pr.py $GITHUB_REPOSITORY
             /sync_patchwork.py -c /config.json -b $WORKFLOW -s $GITHUB_WORKSPACE $SPACE $GITHUB_REPOSITORY
         ;;
     ci|CI|Ci)

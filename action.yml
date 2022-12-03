@@ -3,7 +3,7 @@ name: 'bzcafe'
 description: 'BlueZ CI Automation Framework'
 inputs:
   task:
-    description: Name of task to perform. [sync, patchwork, ci]
+    description: Name of task to perform. [sync, patchwork, ci, cleanup]
     required: true
   base_folder:
     description: Base folder for work
