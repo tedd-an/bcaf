@@ -54,3 +54,14 @@ class GithubTool:
             return False
 
         return True
+
+    def pr_get_issue_comments(self, pr):
+        try:
+            comments = pr.get_issue_comments()
+        except:
+            return None
+
+        return comments
+
+    def pr_close(self, pr):
+        pr.edit(state="closed")
