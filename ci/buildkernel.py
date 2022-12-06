@@ -18,7 +18,7 @@ class BuildKernel(Base):
     """
 
     def __init__(self, ci_data, kernel_config=None, simple_build=True,
-                 dry_run=None):
+                 build_params=None, dry_run=None):
 
         # Common
         self.name = "BuildKernel"
@@ -32,11 +32,17 @@ class BuildKernel(Base):
         else:
             self.kernel_config = '/bluetooth_build.config'
 
+        # Extra build params
+        self.build_params = build_params
+
         # Override the dry_run flag.
         self.dry_run = self.ci_data.config['dry_run']
         if dry_run:
             self.log_dbg(f"Override the dry_run flag: {dry_run}")
             self.dry_run = dry_run
+
+        # Save the error output
+        self.stderr = None
 
         super().__init__()
 
@@ -67,9 +73,15 @@ class BuildKernel(Base):
 
         # make
         self.log_info("Run make")
+
+        base_cmd = ["make", "-j2"]
+        if self.build_params:
+            base_cmd += self.build_params
+        self.log_dbg(f"Base Command: {base_cmd}")
+
         if self.simple_build:
             self.log_info("Simple build - Bluetooth only")
-            cmd = ["make", "-j2", "W=1", "net/bluetooth/"]
+            cmd = base_cmd.append('net/bluetooth/')
             (ret, stdout, stderr) = cmd_run(cmd,
                                             cwd=self.ci_data.src_dir)
             if ret:
@@ -78,8 +90,9 @@ class BuildKernel(Base):
                                 "BuildKernel: make FAIL: " + stderr,
                                 None, self.dry_run)
                 self.add_failure_end_test(stderr)
+            self.stderr = stderr
 
-            cmd = ["make", "-j2", "W=1", "drivers/bluetooth/"]
+            cmd = base_cmd.append('drivers/bluetooth/')
             (ret, stdout, stderr) = cmd_run(cmd,
                                             cwd=self.ci_data.src_dir)
             if ret:
@@ -88,10 +101,12 @@ class BuildKernel(Base):
                                 "BuildKernel: make FAIL: " + stderr,
                                 None, self.dry_run)
                 self.add_failure_end_test(stderr)
+            self.stderr += stderr
+
         else:
             # full build
             self.log_info("Full build")
-            cmd = ["make", "-j2"]
+            cmd = base_cmd
             (ret, stdout, stderr) = cmd_run(cmd,
                                             cwd=self.ci_data.src_dir)
             if ret:
@@ -100,6 +115,7 @@ class BuildKernel(Base):
                                 "BuildKernel: make FAIL: " + stderr,
                                 None, self.dry_run)
                 self.add_failure_end_test(stderr)
+            self.stderr = stderr
 
         submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
                         self.name, Verdict.PASS,
