@@ -81,7 +81,8 @@ class BuildKernel(Base):
 
         if self.simple_build:
             self.log_info("Simple build - Bluetooth only")
-            cmd = base_cmd.append('net/bluetooth/')
+            cmd = base_cmd
+            cmd.append('net/bluetooth/')
             (ret, stdout, stderr) = cmd_run(cmd,
                                             cwd=self.ci_data.src_dir)
             if ret:
@@ -92,7 +93,8 @@ class BuildKernel(Base):
                 self.add_failure_end_test(stderr)
             self.stderr = stderr
 
-            cmd = base_cmd.append('drivers/bluetooth/')
+            cmd = base_cmd
+            cmd.append('drivers/bluetooth/')
             (ret, stdout, stderr) = cmd_run(cmd,
                                             cwd=self.ci_data.src_dir)
             if ret:
