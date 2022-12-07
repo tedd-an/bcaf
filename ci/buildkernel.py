@@ -5,9 +5,10 @@ import shutil
 sys.path.insert(0, '../libs')
 from libs import cmd_run
 
-from ci import Base, Verdict, submit_pw_check
+from ci import Verdict, EndTest, submit_pw_check
+from ci import GenericKernelBuild
 
-class BuildKernel(Base):
+class BuildKernel(GenericKernelBuild):
     """Build Kernel class
     This class is used to build the kernel for Bluetooth
     There are two different build type:
@@ -18,7 +19,7 @@ class BuildKernel(Base):
     """
 
     def __init__(self, ci_data, kernel_config=None, simple_build=True,
-                 build_params=None, dry_run=None):
+                 make_params=None, src_dir=None, dry_run=None):
 
         # Common
         self.name = "BuildKernel"
@@ -26,14 +27,14 @@ class BuildKernel(Base):
         self.ci_data = ci_data
         self.simple_build = simple_build
 
-        # Set the default build config.
-        if kernel_config:
-            self.kernel_config = kernel_config
-        else:
-            self.kernel_config = '/bluetooth_build.config'
+        # Override the src dir
+        self.src_dir = ci_data.src_dir
+        if src_dir:
+            self.log_dbg(f"Override src_dir {src_dir}")
+            self.src_dir = src_dir
 
         # Extra build params
-        self.build_params = build_params
+        self.make_params = make_params
 
         # Override the dry_run flag.
         self.dry_run = self.ci_data.config['dry_run']
@@ -44,85 +45,40 @@ class BuildKernel(Base):
         # Save the error output
         self.stderr = None
 
-        super().__init__()
+        super().__init__(kernel_config=kernel_config, simple_build=simple_build,
+                         make_params=make_params, work_dir=self.src_dir)
 
         self.log_dbg("Initialization completed")
 
     def run(self):
         self.log_dbg("Run")
 
-        self.start_timer()
+        try:
+            super().run()
+        except EndTest as e:
+            self.log_err("Test ended with an error")
+        finally:
+            self.log_info(f"Test Verdict: {self.verdict}")
 
-        # Copy the build config to source dir
-        self.log_info(f"Copying {self.kernel_config} to source dir")
-        shutil.copy(self.kernel_config, os.path.join(self.ci_data.src_dir,
-                                                     ".config"))
+        self.log_info(f"Test Verdict: {self.verdict.name}")
 
-        # Update .config
-        self.log_info("Run make olddefconfig")
-        cmd = ["make", "olddefconfig"]
-        (ret, stdout, stderr) = cmd_run(cmd,
-                                        cwd=self.ci_data.src_dir)
-        if ret:
-            self.log_err("Failed to config the kernel")
+        # Reposrt the result to Patchwork
+        if self.verdict == Verdict.FAIL:
             submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
                             self.name, Verdict.FAIL,
-                            "BuildKernel: make olddefconfig FAIL: " + stderr,
+                            "BuildKernel: FAIL: " + self.output,
                             None, self.dry_run)
-            self.add_failure_end_test(stderr)
+            # Test verdict and output is already set by the super().run().
+            # Just raising EndTest exception is enough here
+            raise EndTest
 
-        # make
-        self.log_info("Run make")
-
-        base_cmd = ["make", "-j2"]
-        if self.build_params:
-            base_cmd += self.build_params
-        self.log_dbg(f"Base Command: {base_cmd}")
-
-        if self.simple_build:
-            self.log_info("Simple build - Bluetooth only")
-            cmd = base_cmd
-            cmd.append('net/bluetooth/')
-            (ret, stdout, stderr) = cmd_run(cmd,
-                                            cwd=self.ci_data.src_dir)
-            if ret:
-                submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
-                                self.name, Verdict.FAIL,
-                                "BuildKernel: make FAIL: " + stderr,
-                                None, self.dry_run)
-                self.add_failure_end_test(stderr)
-            self.stderr = stderr
-
-            cmd = base_cmd
-            cmd.append('drivers/bluetooth/')
-            (ret, stdout, stderr) = cmd_run(cmd,
-                                            cwd=self.ci_data.src_dir)
-            if ret:
-                submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
-                                self.name, Verdict.FAIL,
-                                "BuildKernel: make FAIL: " + stderr,
-                                None, self.dry_run)
-                self.add_failure_end_test(stderr)
-            self.stderr += stderr
-
-        else:
-            # full build
-            self.log_info("Full build")
-            cmd = base_cmd
-            (ret, stdout, stderr) = cmd_run(cmd,
-                                            cwd=self.ci_data.src_dir)
-            if ret:
-                submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
-                                self.name, Verdict.FAIL,
-                                "BuildKernel: make FAIL: " + stderr,
-                                None, self.dry_run)
-                self.add_failure_end_test(stderr)
-            self.stderr = stderr
-
+        # Build success
         submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
                         self.name, Verdict.PASS,
                         "BuildKernel PASS",
                         None, self.dry_run)
+        # Actually no need to call success() here. But add it here just for
+        # reference
         self.success()
 
     def post_run(self):
