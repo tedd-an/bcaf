@@ -375,10 +375,6 @@ def cleanup_pullrequest(ci_data, new_series):
 
         log_debug(f"PW_SID:{pw_sid} not found in PR list. Close PR")
 
-        if ci_data.config['dry_run']:
-            log_debug("Dry-Run is set. Skip closing Github Pull Request")
-            continue
-
         ci_data.gh.close_pr(pr.number)
 
     log_debug("##### Clean Up Pull Request Done #####")
