@@ -1,5 +1,6 @@
 from .base import Base, EndTest, Verdict, submit_pw_check
 from .genericbuild import GenericBuild
+from .generickernelbuild import GenericKernelBuild
 from .buildbluez import BuildBluez
 from .buildell import BuildEll
 from .buildkernel import BuildKernel
