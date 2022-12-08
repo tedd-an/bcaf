@@ -16,4 +16,5 @@ from .scanbuild import ScanBuild
 from .subjectprefix import SubjectPrefix
 from .testrunner import TestRunner
 from .testrunnersetup import TestRunnerSetup
+from .checksparse import CheckSparse
 
