@@ -116,10 +116,10 @@ class CheckAllWarning(GenericKernelBuild):
 
         # if empty, return None
         if not len(output_line):
+            self.log_dbg("Empty output. Nothing to do")
             return None
 
         output_dict = {}
-        inc_file = False
         curr_key = None
 
         for line in output_line:
