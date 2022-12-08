@@ -17,4 +17,4 @@ from .subjectprefix import SubjectPrefix
 from .testrunner import TestRunner
 from .testrunnersetup import TestRunnerSetup
 from .checksparse import CheckSparse
-
+from .checkallwarning import CheckAllWarning
