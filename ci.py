@@ -236,6 +236,9 @@ def create_test_list_kernel(ci_data):
     kernel_config = os.path.join(ci_data.config['bluez_dir'], "doc", "ci.config")
     test_list.append(ci.BuildKernel(ci_data, kernel_config=kernel_config))
 
+    # Check All Warning
+    test_list.append(ci.CheckAllWarning(ci_data, kernel_config=kernel_config))
+
     # CheckSparse
     test_list.append(ci.CheckSparse(ci_data, kernel_config=kernel_config))
 
