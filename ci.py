@@ -239,6 +239,9 @@ def create_test_list_kernel(ci_data):
     # BuildKernel32
     test_list.append(ci.BuildKernel32(ci_data, kernel_config=kernel_config))
 
+    # CheckSparse
+    test_list.append(ci.CheckSparse(ci_data, kernel_config=kernel_config))
+
     # TestRunnerSetup
     tester_config = os.path.join(ci_data.config['bluez_dir'],
                                  "doc", "tester.config")
