@@ -67,20 +67,12 @@ class GenericKernelBuild(Base):
             self.log_info("GenericKernelBuild: Simple build - Bluetooth only")
             cmd = base_cmd
             cmd.append('net/bluetooth/')
-            (ret, stdout, stderr) = cmd_run(cmd, cwd=self.work_dir)
-            if ret:
-                self.log_err("GenericKernelBuild: build fail net/bluetooth")
-                self.add_failure_end_test(stderr)
-            self.stderr = stderr
-
-            cmd = base_cmd
             cmd.append('drivers/bluetooth/')
             (ret, stdout, stderr) = cmd_run(cmd, cwd=self.work_dir)
             if ret:
-                self.log_err("GenericKernelBuild: build fail drivers/blueooth")
+                self.log_err("GenericKernelBuild: build fail")
                 self.add_failure_end_test(stderr)
-            self.stderr += stderr
-
+            self.stderr = stderr
         else:
             # full build
             self.log_info("Full build")
