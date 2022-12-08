@@ -83,3 +83,6 @@ class BuildKernel(GenericKernelBuild):
 
     def post_run(self):
         self.log_dbg("Post Run...")
+
+        self.log_dbg("Clean the source")
+        super().post_run()

@@ -87,3 +87,11 @@ class GenericKernelBuild(Base):
 
     def post_run(self):
         self.log_dbg("GenericKernelBuild: Post Run...")
+
+        # Clean
+        cmd = ['make', 'clean']
+        (ret, stdout, stderr) = cmd_run(cmd, cwd=self.work_dir)
+        if ret:
+            self.log_err("Fail to clean the source")
+
+        # AR: should it continue the test?

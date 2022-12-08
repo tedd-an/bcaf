@@ -103,6 +103,9 @@ class CheckSparse(GenericKernelBuild):
     def post_run(self):
         self.log_dbg("Post Run...")
 
+        self.log_dbg("Clean the source")
+        super().post_run()
+
     def parse_output(self, output):
         """Read output log and creates the dict whcih has key with file path
         and the value is the output log in list

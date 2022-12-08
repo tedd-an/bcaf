@@ -87,6 +87,10 @@ class BuildKernel32(GenericKernelBuild):
     def post_run(self):
         self.log_dbg("Post Run...")
 
+        self.log_dbg("Clean the source")
+        super().post_run()
+
+
     def create_config32(self, orig_config):
         """Create config file for 32bit build
         This is a custome step and assume that the orig config file is used
