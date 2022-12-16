@@ -38,6 +38,8 @@ class GenericBuild(Base):
         self.install = install
         self.install_params = install_params
 
+        self.stderr = None
+
         self.log_dbg("Initialization completed")
 
     def run(self):
@@ -65,6 +67,8 @@ class GenericBuild(Base):
         if ret:
             self.log_err(f"GenericBuild: Make failed: {ret}")
             self.add_failure_end_test(stderr)
+        # Save the stderr for future processing even if the cmd_run success
+        self.stderr = stderr
 
         # Make Install
         if self.install:
@@ -75,6 +79,8 @@ class GenericBuild(Base):
             if ret:
                 self.log_err(f"GenericBuild: Install failed: {ret}")
                 self.add_failure_end_test(stderr)
+        # Save the stderr for future processing even if the cmd_run success
+        self.stderr = stderr
 
         self.success()
 
