@@ -18,3 +18,5 @@ from .testrunner import TestRunner
 from .testrunnersetup import TestRunnerSetup
 from .checksparse import CheckSparse
 from .checkallwarning import CheckAllWarning
+from .checksmatch import CheckSmatch
+
