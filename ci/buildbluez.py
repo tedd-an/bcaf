@@ -8,7 +8,8 @@ class BuildBluez(GenericBuild):
     class, it checks the verdict and reports the result.
     """
 
-    def __init__(self, ci_data, src_dir=None, config_params=None, dry_run=None):
+    def __init__(self, ci_data, src_dir=None, config_params=None,
+                 make_params=None, dry_run=None):
 
         self.name = "BluezMake"
         self.desc = "Build BlueZ"
@@ -20,12 +21,15 @@ class BuildBluez(GenericBuild):
             self.log_dbg(f"Override src_dir {src_dir}")
             self.src_dir = src_dir
 
+        self.make_params = make_params
+
         self.dry_run = self.ci_data.config['dry_run']
         if dry_run:
             self.log_dbg(f"Override the dry_run flag: {dry_run}")
             self.dry_run = dry_run
 
-        super().__init__(config_params=config_params, work_dir=self.src_dir)
+        super().__init__(config_params=config_params, work_dir=self.src_dir,
+                         make_params=self.make_params)
 
         self.log_dbg("Initialization completed")
 
