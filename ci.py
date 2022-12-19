@@ -197,6 +197,9 @@ def create_test_list_user(ci_data):
     # Make check w/ Valgrind
     test_list.append(ci.CheckValgrind(ci_data))
 
+    # Check Smatch
+    test_list.append(ci.CheckSmatch(ci_data, "user"))
+
     # Make with Exteranl ELL
     test_list.append(ci.MakeExtEll(ci_data))
 
