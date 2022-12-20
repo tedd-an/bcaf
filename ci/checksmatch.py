@@ -68,6 +68,8 @@ class CheckSmatch(Base):
 
         self.log_dbg("Run")
 
+        self.start_timer()
+
         if not self.target:
             self.log_err(f"Invalid setup: space: {self.space}")
             self.add_failure_end_test("Invalid setup")
