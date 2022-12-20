@@ -69,6 +69,7 @@ def cmd_run(cmd: List[str], shell: bool = False, add_env: Dict[str, str] = None,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             bufsize=1, universal_newlines=True,
                             pass_fds=pass_fds)
+    log_debug(f"PROC args: {proc.args}")
 
     # Print the stdout in realtime
     for line in proc.stdout:
