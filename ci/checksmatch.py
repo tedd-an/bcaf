@@ -51,7 +51,7 @@ class CheckSmatch(Base):
                                       make_params=make_params, dry_run=True)
         elif self.space == "user":
             config_params = ["--disable-asan", "--disable-lsan",
-                             "--disable_ubsan", "--disable-android"]
+                             "--disable-ubsan", "--disable-android"]
             make_params.append(f"CHECK=\"{self.tool_dir}/smatch --full-path\"")
             make_params.append(f"CC={self.tool_dir}/cgcc")
             # Set the dry_run=True so it won't submit the result to the pw
