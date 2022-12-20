@@ -44,7 +44,7 @@ class CheckSmatch(Base):
         self.target = None
         make_params = []
         if self.space == "kernel":
-            make_params.append(f"CHECK=\"{self.tool_dir}/smatch -p=kernel\"")
+            make_params.append(f"CHECK={self.tool_dir}/smatch -p=kernel")
             make_params.append("C=1")
             # Set the dry_run=True so it won't submit the result to the pw
             self.target = BuildKernel(self.ci_data, kernel_config=kernel_config,
@@ -52,7 +52,7 @@ class CheckSmatch(Base):
         elif self.space == "user":
             config_params = ["--disable-asan", "--disable-lsan",
                              "--disable-ubsan", "--disable-android"]
-            make_params.append(f"CHECK=\"{self.tool_dir}/smatch --full-path\"")
+            make_params.append(f"CHECK={self.tool_dir}/smatch --full-path")
             make_params.append(f"CC={self.tool_dir}/cgcc")
             # Set the dry_run=True so it won't submit the result to the pw
             self.target = BuildBluez(self.ci_data, config_params=config_params,
