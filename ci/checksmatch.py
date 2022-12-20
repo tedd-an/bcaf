@@ -133,7 +133,7 @@ class CheckSmatch(Base):
         self.log_dbg("Post Run...")
 
         self.log_dbg("Clean the source")
-        super().target.post_run()
+        self.target.post_run()
 
     def parse_output(self, output):
         """Read output log and creates the dict whcih has key with file path
