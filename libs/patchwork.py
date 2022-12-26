@@ -173,3 +173,34 @@ class Patchwork():
             f.write(patch['content'])
 
         return filename
+
+    def series_get_file_list(self, series):
+        """Get the list of files from the patches in the series"""
+
+        file_list = []
+        new_file_list = []
+
+        for patch in series['patches']:
+            full_patch = self.get_patch(patch['id'])
+            (_file_list, _new_file_list) = libs.patch_file_list(full_patch['diff'])
+            file_list += _file_list
+            new_file_list += _new_file_list
+
+        # Remove the duplicate files
+        file_list = list(set(file_list))
+        new_file_list = list(set(new_file_list))
+
+        libs.log_debug(f"Files in series: {file_list}")
+        libs.log_debug(f"New files in series: {new_file_list}")
+
+        # Remove the files in new_file_list from file_list
+        for new_file in new_file_list:
+            if new_file in file_list:
+                libs.log_debug(f"Found new file {new_file} from file list")
+                file_list = list(filter(lambda item: item != new_file, file_list))
+                libs.log_debug(f"file_list updated: {file_list}")
+
+        libs.log_debug(f"FINAL: files in series: {file_list}")
+        libs.log_debug(f"FINAL: new files in series: {new_file_list}")
+
+        return (file_list, new_file_list)

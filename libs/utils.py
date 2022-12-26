@@ -102,4 +102,40 @@ def cmd_run(cmd: List[str], shell: bool = False, add_env: Dict[str, str] = None,
     log_info(f"------------- CMD_RUN END ({elapsed:.2f} s) -------------")
     return proc.returncode, stdout, stderr
 
+def patch_file_list(diff):
+    """Read the patch diff and get the list of files in the patch.
+    This function returns the tuple with (file_list, new_file_list)
+    """
+    file_list = []
+    new_file_list = []
+    # Check input parameter
+    if not diff or len(diff) == 0:
+        log_error("WARNING: Patch diff is empty")
+        return (file_list, new_file_list)
+    lines = diff.split('\n')
+    # Using iter() method so instead of normal string iteration.
+    # In case of new file is added, it needs to read the next time to get the
+    # name of new file added.
+    iter_lines = iter(lines)
+    for line in iter_lines:
+        try:
+            # Use --- (before) instead of +++ (after)
+            if re.search(r'^\-\-\- ', line):
+                # For new file, it should be /dev/null.
+                log_debug(f"Found the file name...{line}")
+                if line.find('dev/null') >= 0:
+                    log_debug("Detect new file. Add it to new_file_list")
+                    # Need to check the next line to get new file name
+                    next_line = next(iter_lines)
+                    new_file_list.append(next_line[next_line.find('/')+1:])
+                    continue
+                # Existing file. Trim '--- /'
+                log_debug("Detect file. Add it to file_list")
+                file_list.append(line[line.find('/')+1:])
+        except StopIteration:
+            # End of iteration or no next line. Nothing to do.
+            pass
+    log_debug(f"files found in patch diff: {file_list}")
+    log_debug(f"new files found in patch diff: {new_file_list}")
+    return (file_list, new_file_list)
 
