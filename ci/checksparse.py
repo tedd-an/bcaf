@@ -84,7 +84,7 @@ class CheckSparse(GenericKernelBuild):
 
         if output_str != "":
             # Found error and return warning
-            submit_pw_check(self.ci_Data.pw, self.ci_data.patch_1,
+            submit_pw_check(self.ci_data.pw, self.ci_data.patch_1,
                             self.name, Verdict.WARNING,
                             "CheckSparse WARNING " + output_str,
                             None, self.dry_run)
