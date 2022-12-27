@@ -104,8 +104,10 @@ class CheckSmatch(Base):
         self.log_dbg(f"Output files: {output_dict}")
 
         # Check files in the patch
-        file_list = self.series_get_file_list(self.ci_data, self.ci_data.series,
-                                              ignore_new_file=True)
+        (_file_list, _new_file_list) = self.ci_data.pw.series_get_file_list(
+                                                        self.ci_data.series)
+        # Combine two lists into one
+        file_list = _file_list + _new_file_list
 
         # File exist in otput_dict?
         output_str = ""
@@ -189,92 +191,3 @@ class CheckSmatch(Base):
                 inc_file = True
 
         return output_dict
-
-    def patch_get_new_file_list(self, patch):
-        """
-        Parse patch to get the file that is newly added
-        """
-
-        file_list = []
-
-        # If patch has no contents, return empty file
-        if patch == None:
-            self.log_err("WARNING: No file found in patch")
-            return file_list
-
-        # split patch(in string) to list of string by newline
-        lines = patch.split('\n')
-        iter_lines = iter(lines)
-        for line in iter_lines:
-            try:
-                if re.search(r'^\-\-\- ', line):
-                    if line.find('dev/null') >= 0:
-                        # Detect new file. Read next line to get the filename
-                        line2 = next(iter_lines)
-                        file_list.append(line2[line2.find('/')+1:])
-            except StopIteration:
-                # End of iteration or no next line. Nothing to do. Just pass
-                pass
-        self.log_dbg(f"New file in the patch: {file_list}")
-
-        return file_list
-
-    def patch_get_file_list(self, patch):
-        """
-        Parse patch to get the file list
-        """
-
-        file_list = []
-
-        # If patch has no contents, return empty file
-        if patch == None:
-            self.log_err("WARNING: No file found in patch")
-            return file_list
-
-        # split patch(in string) to list of string by newline
-        lines = patch.split('\n')
-        for line in lines:
-            # Use --- (before) instead of +++ (after).
-            # If new file is added, --- is /dev/null and can be ignored
-            # If file is removed, file in --- still exists in the tree
-            # The corner case is if the patch adds new files. Even in this case
-            # even if new files are ignored, Makefile should be changed as well
-            # so it still can be checked.
-            if re.search(r'^\-\-\- ', line):
-                # For new file, it should be dev/null. Ignore the file.
-                if line.find('dev/null') >= 0:
-                    self.log_dbg("New file is added. Ignore in the file list")
-                    continue
-
-                # Trim the '--- /'
-                file_list.append(line[line.find('/')+1:])
-        self.log_dbg(f"files found in the patch: {file_list}")
-
-        return file_list
-
-    def series_get_file_list(self, ci_data, series, ignore_new_file=False):
-        """
-        Get the list of files from the patches in the series
-        """
-
-        file_list = []
-        new_file_list = []
-
-        for patch in series['patches']:
-            full_patch = ci_data.pw.get_patch(patch['id'])
-            file_list += self.patch_get_file_list(full_patch['diff'])
-            if ignore_new_file:
-                new_file_list += self.patch_get_new_file_list(full_patch['diff'])
-
-        if ignore_new_file == False or len(new_file_list) == 0:
-            return file_list
-
-        self.log_dbg("Check if new file is in the file list")
-        new_list = []
-        for filename in file_list:
-            if filename in new_file_list:
-                self.log_dbg(f"file: {filename} is in new_file_list. Don't count")
-                continue
-            new_list.append(filename)
-
-        return new_list
