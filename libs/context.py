@@ -69,6 +69,7 @@ class Context():
             log_error("Failed to initialize RepoTool class")
             raise ContextError
         self.src_dir = self.src_repo.path()
+        self.patch_root = patch_root
 
         # Custome confguration
         for kw in kwargs:
