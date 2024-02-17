@@ -65,9 +65,13 @@ class IncrementalBuild(Base):
             # Apply patch
             if self.ci_data.src_repo.git_am(patch_file):
                 self.log_err("Failed to apply patch")
-                msg = self.ci_data.src_repo.stderr
-                self.ci_data.src_repo.git_am(abort=True)
-                self.add_failure_end_test(msg)
+                self.log_info("Cleaning git tree and retrying")
+                self.ci_data.src_repo.git_clean()
+                if self.ci_data.src_repo.git_am(patch_file):
+                    self.log_err("Failed to apply patch. Giving up")
+                    msg = self.ci_data.src_repo.stderr
+                    self.ci_data.src_repo.git_am(abort=True)
+                    self.add_failure_end_test(msg)
 
             # Test Build
             try:
