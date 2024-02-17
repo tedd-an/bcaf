@@ -58,7 +58,7 @@ class IncrementalBuild(Base):
 
             # Save patch mbox to file
             patch_file = self.ci_data.pw.save_patch_mbox(patch['id'],
-                            os.path.join(self.ci_data.src_dir,
+                            os.path.join(self.ci_data.patch_dir,
                                          f"{patch['id']}.patch"))
             self.log_dbg(f"Save patch: {patch_file}")
 
