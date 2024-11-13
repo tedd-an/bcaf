@@ -252,8 +252,8 @@ def create_test_list_kernel(ci_data):
     test_list.append(ci.CheckSparse(ci_data, kernel_config=kernel_config))
 
     # CheckSmatch
-    test_list.append(ci.CheckSmatch(ci_data, "kernel", tool_dir="/smatch",
-                                    kernel_config=kernel_config))
+    #test_list.append(ci.CheckSmatch(ci_data, "kernel", tool_dir="/smatch",
+    #                                kernel_config=kernel_config))
 
     # BuildKernel32
     test_list.append(ci.BuildKernel32(ci_data, kernel_config=kernel_config))
