@@ -13,7 +13,7 @@ class Context():
     """Collection of data for bzcafe. It is useful for CI"""
 
     def __init__(self, config_file=None, github_repo=None, src_dir=None,
-                 **kwargs):
+                 patch_root=None, **kwargs):
 
         # Init config
         log_info(f"Initialize config file: {config_file}")
